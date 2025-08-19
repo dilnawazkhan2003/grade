@@ -1,711 +1,760 @@
-// src/components/Page5.jsx
-
-import React, { useState } from 'react';
-
-// Material-UI Imports
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useUser } from '../context/UserContext';
+import axios from 'axios';
 import {
-  createTheme,
-  ThemeProvider,
-  CssBaseline, // For basic resets and global background color
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  Button,
-  Select,
-  MenuItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tabs,
-  Tab,
-  LinearProgress,
-  Avatar,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  TextField,
+  Box, Typography, Button, Paper, Avatar, Divider, LinearProgress,
+  Grid, Card, CardContent, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, CircularProgress, Alert
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles'; // For accessing theme breakpoints etc.
+import {
+  ArrowBack, BarChart, PieChart, Timeline,
+  CheckCircle, Cancel, Help, Flag, Replay, Warning
+} from '@mui/icons-material';
+import { styled } from '@mui/material/styles';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-// Material-UI Icons
-// Make sure to install: npm install @mui/icons-material
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import StarIcon from '@mui/icons-material/Star';
-import EditIcon from '@mui/icons-material/Edit';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PercentIcon from '@mui/icons-material/Percent';
-import DownloadIcon from '@mui/icons-material/Download';
-
-// Fontsource for Roboto font
-// Make sure to install: npm install @fontsource/roboto
-import '@fontsource/roboto/300.css';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/700.css';
-
-// 1. Custom Material-UI Theme
-const testAnalysisTheme = createTheme({
+/* -------------------------- THEME -------------------------- */
+const theme = createTheme({
   palette: {
-    primary: {
-      main: '#2196F3', // --primary-blue
-      dark: '#1a73e8', // --dark-blue
-      light: '#e0f2f7', // --light-blue
-    },
-    secondary: {
-      main: '#9c27b0', // --purple
-    },
-    text: {
-      primary: '#333', // --text-color
-      secondary: '#666', // --light-text
-      dark: '#555', // --dark-grey-text
-      light: '#999', // --light-grey-text
-    },
-    background: {
-      default: '#f9f9f9', // --grey-bg
-      paper: '#fff', // --card-bg, --header-bg
-    },
-    success: {
-      main: '#4CAF50', // --green
-    },
-    error: {
-      main: '#f44336', // --red
-    },
-    warning: {
-      main: '#FF9800', // --orange
-    },
-    info: {
-      main: '#007bff', // --link-color (used for general info/links)
-    },
-    custom: { // Custom colors not part of standard MUI palette
-      yellow: '#FFC107',
-      border: '#ddd',
-      lightGrey: '#eee',
-      darkGreyBg: '#f2f2f2',
-    },
+    primary: { main: '#2196F3' },
+    secondary: { main: '#007bff' },
+    error: { main: '#f44336' },
+    success: { main: '#4CAF50' },
+    warning: { main: '#FF9800' },
+    info: { main: '#9c27b0' },
   },
   typography: {
     fontFamily: 'Roboto, sans-serif',
-    h2: { // Section titles like "Overall Performance Summary"
-        fontSize: '22px',
-        fontWeight: 600,
-        color: '#555',
-        marginBottom: '20px',
-        borderBottom: '1px solid #ddd',
-        paddingBottom: '10px',
-        '@media (max-width:768px)': {
-            fontSize: '20px',
-        },
-    },
-    h6: { // Sidebar titles like "Top Rankers"
-      fontSize: '18px',
-      fontWeight: 600,
-      color: '#555',
-      marginBottom: '15px',
-      borderBottom: '1px solid #ddd',
-      paddingBottom: '8px',
-      '@media (max-width:480px)': {
-        fontSize: '16px',
-      },
-    },
-    subtitle1: { // Metric card values (e.g., "49104 / 50526")
-      fontSize: '20px',
-      fontWeight: 'bold',
-      color: '#555',
-      lineHeight: 1.2,
-      '@media (max-width:480px)': {
-        fontSize: '18px',
-      },
-      '@media (max-width:360px)': {
-        fontSize: '16px',
-      },
-    },
-    body1: { // Default text size
-        fontSize: '14px',
-        lineHeight: 1.6,
-        '@media (max-width:480px)': {
-          fontSize: '13px',
-        },
-    },
-    body2: { // Smaller descriptive text
-        fontSize: '13px',
-        '@media (max-width:480px)': {
-          fontSize: '12px',
-        },
-    },
-  },
-  components: {
-    MuiButton: {
-      defaultProps: {
-        disableElevation: true, // Typically removes the default Material-UI button shadow
-      },
-      styleOverrides: {
-        root: {
-          textTransform: 'none', // Prevent uppercase transformation
-          fontWeight: 500,
-          borderRadius: '5px',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          padding: '8px 15px', // Default padding for all buttons
-          // Specific variants will inherit and override this
-          '&.MuiButton-containedPrimary': { // Styles for primary contained buttons
-            backgroundColor: '#2196F3',
-            color: 'white',
-            border: '1px solid #2196F3',
-            '&:hover': {
-              backgroundColor: '#1a73e8',
-              borderColor: '#1a73e8',
-            },
-          },
-        },
-      },
-    },
-    MuiTabs: { // Styles for the Tabs container
-      styleOverrides: {
-        root: {
-          borderBottom: '1px solid #ddd',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          // MUI's `scrollButtons="auto"` and `variant="scrollable"` handle overflow naturally
-        },
-      },
-    },
-    MuiTab: { // Styles for individual Tab components
-      styleOverrides: {
-        root: {
-          textTransform: 'none', // Prevent uppercase transformation
-          fontWeight: 500,
-          padding: '10px 15px',
-          fontSize: '15px',
-          color: '#666',
-          borderBottom: '2px solid transparent', // Underline is part of the border
-          transition: 'all 0.2s ease', // Smooth transition for hover/selection
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          '&.Mui-selected': {
-            color: '#2196F3',
-            borderColor: '#2196F3',
-            fontWeight: 600,
-          },
-          '&:hover:not(.Mui-selected)': {
-            color: '#333',
-          },
-          '@media (max-width:768px)': {
-            padding: '8px 12px',
-            fontSize: '14px',
-          },
-        },
-      },
-    },
-    MuiSelect: { // Styles for the Select dropdown
-      styleOverrides: {
-        select: { // Target the internal select element for padding
-          padding: '8px 12px',
-          fontSize: '14px',
-          borderRadius: '5px', // Needs to be on the root too for full effect
-        },
-        root: { // Target the root component for border and background
-            border: '1px solid #ddd',
-            borderRadius: '5px',
-            backgroundColor: '#fff',
-            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { // Focus border color
-                borderColor: '#2196F3',
-            },
-        },
-      },
-    },
-    MuiPaper: { // Styles for Paper component (used for cards, table, sidebar)
-      styleOverrides: {
-        root: {
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)', // Soft shadow
-          borderRadius: '8px',
-          backgroundColor: '#fff',
-        },
-      },
-    },
-    MuiTableCell: { // Styles for table cells
-      styleOverrides: {
-        root: {
-          padding: '12px 15px',
-          borderBottom: '1px solid #ddd',
-          textAlign: 'left',
-          whiteSpace: 'nowrap', // Prevent text wrapping in table cells
-          '@media (max-width:768px)': {
-            padding: '10px 12px',
-            fontSize: '13px',
-          },
-          '@media (max-width:480px)': {
-            padding: '8px 10px',
-            fontSize: '12px',
-          },
-        },
-        head: { // Styles for table header cells
-          backgroundColor: '#e0f2f7',
-          color: '#1a73e8',
-          fontWeight: 600,
-          fontSize: '15px',
-        },
-      },
-    },
-    MuiCssBaseline: { // Global HTML/Body styles
-      styleOverrides: {
-        body: {
-          backgroundColor: '#f9f9f9', // Global background color
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          margin: 0,
-          padding: 0,
-          fontSize: '14px',
-          lineHeight: 1.6,
-          color: '#333',
-          overflowX: 'hidden', // Prevent horizontal scroll on body itself
-        },
-      },
-    },
   },
 });
 
-// 2. Individual Components
+const StyledContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: '100vh',
+  backgroundColor: theme.palette.grey[100],
+  padding: theme.spacing(4),
+  [theme.breakpoints.down('sm')]: {
+    padding: theme.spacing(2)
+  }
+}));
 
-// Fixed "Solutions" Button
-const SolutionButton = () => {
-  const theme = useTheme(); // Hook to access the defined theme
+const PerformanceCard = styled(Card)(({ theme }) => ({
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: theme.shadows[8],
+  },
+  borderRadius: theme.shape.borderRadius * 2
+}));
 
-  return (
-    <Button
-      variant="contained"
-      color="primary"
-      sx={{
-        position: 'fixed',
-        zIndex: 1000,
-        // Mobile styles (fixed at bottom, full width)
-        bottom: 0,
-        left: 0,
-        right: 0,
-        width: '100%',
-        borderRadius: 0, // No border-radius for full-width bottom bar
-        padding: { xs: '15px 20px', md: '8px 15px' }, // Responsive padding
-        fontSize: { xs: '16px', md: '14px' }, // Responsive font size
-        justifyContent: 'center', // Center content horizontally
-        alignItems: 'center', // Center content vertically
-        gap: '8px', // Space between icon and text
-        backgroundColor: 'primary.dark', // Dark blue background for mobile button
-        boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', // Shadow above the button
-        '&:hover': {
-          backgroundColor: 'primary.main', // Primary blue on hover for mobile
-        },
+/* ----------------- HELPERS (KEY FIXES HERE) ----------------- */
 
-        // Desktop styles (fixed at top-right)
-        [theme.breakpoints.up('md')]: { // Apply these styles from 'md' breakpoint upwards
-          top: 15,
-          right: 20,
-          bottom: 'auto', // Remove bottom fixed property
-          left: 'auto', // Remove left fixed property
-          width: 'auto', // Auto width
-          borderRadius: '5px', // Standard border-radius
-          border: '1px solid',
-          borderColor: 'primary.light', // Light blue border
-          boxShadow: '0 2px 5px rgba(0,0,0,0.2)', // Different shadow for desktop
-          backgroundColor: 'primary.main', // Primary blue for desktop button
-          '&:hover': {
-            backgroundColor: 'primary.dark', // Dark blue on hover for desktop
-            borderColor: 'primary.dark',
-          },
-        },
-      }}
-    >
-      Solutions
-    </Button>
-  );
+/** Safely coerce to number. */
+const num = (v, d = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
 };
 
-// Reusable Metric Card
-const MetricCard = ({ icon, value, label, color }) => (
-  <Paper
-    elevation={2} // Corresponds to box-shadow: 0 1px 4px rgba(0,0,0,0.08); from theme paper style
-    sx={{
-      p: { xs: '12px 15px', md: '15px 20px' }, // Responsive padding inside card
-      borderRadius: '8px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px', // Space between icon and text content
-      minWidth: { xs: 140, sm: 150, md: 160 }, // Minimum width for cards to prevent squishing
-      flexShrink: 0, // Prevent cards from shrinking when space is limited (for horizontal scroll)
-      backgroundColor: 'background.paper', // White background
-    }}
-  >
-    <Box sx={{
-        fontSize: { xs: '32px', md: '38px' }, // Responsive icon size
-        color: color, // Dynamic color based on prop
-        lineHeight: 1, // Ensure icon sits well vertically
-        flexShrink: 0, // Icon should not shrink
-    }}>
-        {icon}
-    </Box>
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-      <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', color: 'text.dark', whiteSpace: 'nowrap' }}>
-        {value}
-      </Typography>
-      <Typography variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
-        {label}
-      </Typography>
-    </Box>
-  </Paper>
-);
-
-// Overall Performance Section
-const OverallPerformance = () => {
-  const metrics = [
-    { icon: <EmojiEventsIcon />, value: '49104 / 50526', label: 'Rank', color: 'secondary.main' },
-    { icon: <StarIcon />, value: '0 / 200', label: 'Score', color: 'warning.main' },
-    { icon: <EditIcon />, value: '0 / 100', label: 'Attempted', color: 'primary.main' },
-    { icon: <CheckCircleIcon />, value: '0%', label: 'Accuracy', color: 'success.main' },
-    { icon: <PercentIcon />, value: '2.82%', label: 'Percentile', color: 'error.main' },
-  ];
-
-  return (
-    <Box component="section">
-      <Typography variant="h2">Overall Performance Summary</Typography>
-      <Box
-        sx={{
-          display: 'flex',
-          overflowX: 'auto', // Enable horizontal scroll for cards on small screens
-          flexWrap: { xs: 'nowrap', md: 'wrap' }, // No wrap on mobile, wrap on desktop
-          gap: { xs: '12px', sm: '15px' }, // Responsive spacing between cards
-          pb: { xs: '5px', sm: '10px' }, // Padding at the bottom for scroll visibility
-          scrollPaddingX: { xs: '15px', sm: '20px' }, // Padding for smooth scrolling
-          justifyContent: { xs: 'flex-start', md: 'center' }, // Center cards on desktop
-          mb: { xs: '20px', sm: '40px' }, // Margin below the section
-
-          // Hide scrollbar directly using sx prop
-          '&::-webkit-scrollbar': {
-            display: 'none',
-          },
-          msOverflowStyle: 'none', // IE and Edge
-          scrollbarWidth: 'none', // Firefox
-        }}
-      >
-        {metrics.map((metric) => (
-          <MetricCard key={metric.label} {...metric} />
-        ))}
-      </Box>
-    </Box>
-  );
+/** Normalize any answer for safe comparison (handles arrays, numbers, strings). */
+const normalizeVal = (v) => {
+  if (Array.isArray(v)) {
+    return JSON.stringify([...v].map(String).map(s => s.trim().toLowerCase()).sort());
+  }
+  if (v === null || v === undefined) return '';
+  return String(v).trim().toLowerCase();
 };
 
-// Sectional Summary Table
-const SectionalSummary = () => {
-  const sections = [
-    { name: 'General Intelligence and Reasoning', score: '0 / 50', attempted: '0 / 25', accuracy: '0%', time: '00:04 / 60 min' },
-    { name: 'General Awareness', score: '0 / 50', attempted: '0 / 25', accuracy: '0%', time: '00:00 / 60 min' },
-    { name: 'Quantitative Aptitude', score: '0 / 50', attempted: '0 / 25', accuracy: '0%', time: '00:00 / 60 min' },
-    { name: 'English Comprehension', score: '0 / 50', attempted: '0 / 25', accuracy: '0%', time: '00:00 / 60 min' },
-  ];
-  return (
-    <Box component="section">
-      <Typography variant="h2">Sectional Summary</Typography>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          mb: '20px',
-          flexWrap: 'wrap', // Allow items to wrap on smaller screens
-          justifyContent: { xs: 'flex-start', md: 'center' },
-        }}
-      >
-        <Typography variant="body1">Estimated cutoffs:</Typography>
-        <Select
-            defaultValue="default"
-            size="small"
-            sx={{ minWidth: 200 }} // Minimum width for the select dropdown
-        >
-          <MenuItem value="default">Select your category</MenuItem>
-          <MenuItem value="general">General</MenuItem>
-          <MenuItem value="obc">OBC</MenuItem>
-          <MenuItem value="sc">SC</MenuItem>
-          <MenuItem value="st">ST</MenuItem>
-        </Select>
-      </Box>
+/**
+ * Normalize questions so that each has a stable "id", "correctAnswer", and "marks".
+ * (Avoids random IDs that will never match answers.)
+ */
+const normalizeQuestions = (rawQuestions = []) =>
+  rawQuestions.map((q, idx) => {
+    const id =
+      q.qid ??
+      q.id ??
+      q._id ??
+      q.questionId ??
+      q.key ??
+      q.uuid ??
+      String(idx); // stable fallback: index-based
 
-      {/* Table container, centered on desktop */}
-      <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' } }}>
-        <TableContainer
-            component={Paper} // Render as a Paper component for elevation/shadow
-            elevation={2}
-            sx={{
-                borderRadius: '8px',
-                overflowX: 'auto', // Enable horizontal scroll for table
-                minWidth: { xs: '450px', sm: '550px', md: '650px' }, // Ensure table has enough width for content
-                mb: '30px', // Margin below the table
-                backgroundColor: 'background.paper',
+    // Try common fields for correct answer
+    const correctAnswer =
+      q.correctAnswer ??
+      q.answer ??
+      q.correct ??
+      q.correct_option ??
+      q.correctIndex ??
+      q.correctOption;
 
-                // Hide scrollbar directly using sx prop
-                '&::-webkit-scrollbar': {
-                    display: 'none',
-                },
-                msOverflowStyle: 'none',
-                scrollbarWidth: 'none',
-            }}
-        >
-          <Table>
-            <TableHead>
-              <TableRow>
-                {['Section Name', 'Score', 'Attempted', 'Accuracy', 'Time'].map((head) => (
-                  <TableCell key={head}>{head}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sections.map((row) => (
-                <TableRow key={row.name}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell>{row.score}</TableCell>
-                  <TableCell>{row.attempted}</TableCell>
-                  <TableCell>{row.accuracy}</TableCell>
-                  <TableCell>{row.time}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
-    </Box>
-  );
+    // Positive/negative marks (with safe defaults)
+    const m = q.marks ?? {};
+    const positive =
+      num(m.positive ?? m.pos ?? q.positiveMarks ?? q.mark ?? q.marksPositive, 1);
+    const negative =
+      num(m.negative ?? m.neg ?? q.negativeMarks ?? q.negMark ?? q.marksNegative, 0.25);
+
+    return {
+      ...q,
+      id,
+      correctAnswer,
+      marks: { positive, negative },
+      __idx: idx, // keep original index as a last-resort mapping key
+    };
+  });
+
+/**
+ * Normalize answers to a map keyed by the normalized question.id
+ * Supports:
+ *  - Object map { [qid]: answer }
+ *  - Array of primitives [answer0, answer1, ...] (index-based)
+ *  - Array of objects [{ qid/id/questionId, answer/selected/userAnswer/value }]
+ */
+const normalizeAnswers = (rawAnswers, questions) => {
+  const out = {};
+
+  if (!rawAnswers) return out;
+
+  const indexKeyToId = (key) => {
+    const idx = Number(key);
+    if (Number.isInteger(idx) && questions[idx]) return questions[idx].id;
+    return null;
+  };
+
+  if (Array.isArray(rawAnswers)) {
+    if (rawAnswers.length > 0 && typeof rawAnswers[0] === 'object' && rawAnswers[0] !== null) {
+      // Array of objects
+      rawAnswers.forEach((a, idx) => {
+        const qid =
+          a.qid ??
+          a.id ??
+          a._id ??
+          a.questionId ??
+          (questions[idx] && questions[idx].id);
+
+        const val =
+          a.answer ??
+          a.selected ??
+          a.selectedOption ??
+          a.userAnswer ??
+          a.choice ??
+          a.value;
+
+        if (qid != null && val !== undefined) {
+          out[String(qid)] = val;
+        }
+      });
+    } else {
+      // Array of primitives -> index-based mapping
+      rawAnswers.forEach((val, idx) => {
+        if (questions[idx]) {
+          out[questions[idx].id] = val;
+        }
+      });
+    }
+  } else if (typeof rawAnswers === 'object') {
+    // Object map (keys may be qids or indices)
+    Object.entries(rawAnswers).forEach(([key, val]) => {
+      // Try to match directly to any of the question identity fields
+      const match =
+        questions.find(q =>
+          [q.id, q.qid, q._id, q.questionId, String(q.__idx)].some(k => String(k) === String(key))
+        );
+
+      if (match) {
+        out[match.id] = val;
+      } else {
+        // Try numeric key as array index
+        const idFromIndex = indexKeyToId(key);
+        if (idFromIndex) out[idFromIndex] = val;
+        else out[String(key)] = val; // last resort, may still match if id strings coincide
+      }
+    });
+  }
+
+  return out;
 };
 
-// Chapter Analysis Section with Tabs
-const ChapterAnalysis = () => {
-  const [tab, setTab] = useState(0); // State to control which tab is active (0: Weak, 1: Uncategorized)
+/** Compute performance given normalized questions + answers map. */
+const calculatePerformance = (questions, answersMap) => {
+  if (!questions?.length) return null;
 
-  // Sub-component for individual chapter items
-  const ChapterItem = ({ name, percent, answered, notAnswered, marked }) => (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: { xs: 'column', sm: 'row' }, // Stack on mobile, row on tablet/desktop
-        justifyContent: 'space-between',
-        alignItems: { xs: 'flex-start', sm: 'center' }, // Align items
-        py: '15px', // Vertical padding
-        borderBottom: '1px solid',
-        borderColor: 'custom.lightGrey', // Light grey separator
-        gap: '15px', // Gap between elements
-        flexWrap: 'wrap', // Allow content to wrap
-        '&:last-child': { borderBottom: 'none' }, // Remove border for the last item
-      }}
-    >
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '5px', minWidth: { xs: '180px', sm: '180px', md: '200px' } }}>
-        <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.dark' }}>
-          {name}
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Correct % {percent}%
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={percent} // Progress bar value
-          sx={{
-            width: '100%',
-            height: '6px',
-            borderRadius: '3px',
-            backgroundColor: 'custom.lightGrey', // Background color of the bar
-            '& .MuiLinearProgress-bar': {
-              backgroundColor: 'success.main', // Color of the progress fill
-              borderRadius: '3px',
-            },
-            mt: 0.5
-          }}
-        />
-      </Box>
-      <Box sx={{ display: 'flex', gap: '8px', flexShrink: 0, mt: { xs: '10px', sm: 0 } }}>
-        {/* Avatars for answered, not answered, marked */}
-        <Avatar sx={{ bgcolor: 'success.main', width: 28, height: 28, fontSize: '12px', fontWeight: 'bold', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          {answered}
-        </Avatar>
-        <Avatar sx={{ bgcolor: 'error.main', width: 28, height: 28, fontSize: '12px', fontWeight: 'bold', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          {notAnswered}
-        </Avatar>
-        <Avatar sx={{ bgcolor: 'secondary.main', width: 28, height: 28, fontSize: '12px', fontWeight: 'bold', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          {marked}
-        </Avatar>
-      </Box>
-    </Box>
+  const res = questions.reduce(
+    (acc, q) => {
+      // Only count questions with a defined correct answer
+      if (q.correctAnswer !== undefined) {
+        const userAnswer = answersMap[q.id];
+
+        const isAttempted = !(userAnswer === undefined || userAnswer === null || userAnswer === '');
+        if (!isAttempted) {
+          acc.unanswered += 1;
+          acc.totalMarks += num(q.marks?.positive, 1);
+          return acc;
+        }
+
+        const correct = normalizeVal(userAnswer) === normalizeVal(q.correctAnswer);
+        if (correct) {
+          acc.correct += 1;
+          acc.obtainedMarks += num(q.marks?.positive, 1);
+        } else {
+          acc.incorrect += 1;
+          acc.obtainedMarks -= num(q.marks?.negative, 0.25);
+        }
+
+        acc.totalMarks += num(q.marks?.positive, 1);
+      }
+      return acc;
+    },
+    {
+      correct: 0,
+      incorrect: 0,
+      unanswered: 0,
+      totalMarks: 0,
+      obtainedMarks: 0,
+      attempted: 0,
+    }
   );
 
-  // Sample data for tabs
-  const weakChapters = [
-    { name: '1. Awards and Honours', percent: 0, answered: 2, notAnswered: 14, marked: 23 },
-    { name: '2. Indian Geography', percent: 0, answered: 7, notAnswered: 8, marked: 12 },
-    { name: '3. Sports', percent: 0, answered: 1, notAnswered: 4, marked: 5 },
-  ];
-  const uncategorizedChapters = [
-    { name: '1. Art and Culture', percent: 0, answered: 5, notAnswered: 10, marked: 15 },
-    // Add more uncategorized chapters if needed
-  ];
+  res.attempted = res.correct + res.incorrect;
+  res.accuracy = res.attempted > 0 ? Math.round((res.correct / res.attempted) * 100) : 0;
+  res.percentage = res.totalMarks > 0 ? Math.round((res.obtainedMarks / res.totalMarks) * 100) : 0;
+  res.totalQuestions = questions.length;
 
-  return (
-    <Paper
-      elevation={2}
-      sx={{
-        p: { xs: '20px', md: '20px' },
-        borderRadius: '8px',
-        backgroundColor: 'background.paper',
-        flex: 2, // Allows this paper to take up more space in a flex container
-        minWidth: { xs: '100%', sm: '300px' }, // Responsive min-width
-      }}
-    >
-      <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' } }}>
-        <Tabs value={tab} onChange={(e, newValue) => setTab(newValue)} aria-label="Chapter Analysis Tabs">
-          <Tab label="Weak Chapters" />
-          <Tab label="Uncategorized Chapters" />
-        </Tabs>
-      </Box>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'center' } }}>
-        {tab === 0 && (
-          <Box sx={{ width: '100%', maxWidth: { md: '800px' } }}> {/* Constrain width on larger screens */}
-            {weakChapters.map((ch) => (<ChapterItem key={ch.name} {...ch} />))}
-          </Box>
-        )}
-        {tab === 1 && (
-          <Box sx={{ width: '100%', maxWidth: { md: '800px' } }}>
-            {uncategorizedChapters.map((ch) => (<ChapterItem key={ch.name} {...ch} />))}
-          </Box>
-        )}
-      </Box>
-    </Paper>
-  );
+  return res;
 };
 
-// Right Sidebar Content
-const RightSidebar = () => {
-    const rankers = [
-        { rank: 1, name: 'Anjali Sharma', score: '198.5', pic: 'https://via.placeholder.com/40/FFC107/FFFFFF?text=AS' },
-        { rank: 2, name: 'Rohan Verma', score: '197.0', pic: 'https://via.placeholder.com/40/2196F3/FFFFFF?text=RV' },
-        { rank: 3, name: 'Priya Patel', score: '196.5', pic: 'https://via.placeholder.com/40/9c27b0/FFFFFF?text=PP' },
-    ];
-  return (
-    <Paper
-      elevation={2}
-      sx={{
-        p: { xs: '20px', md: '20px' },
-        borderRadius: '8px',
-        backgroundColor: 'background.paper',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '30px', // Space between Top Rankers and Pass Guaranteed sections
-        flex: 1, // Allows this paper to take up available space in a flex container
-        minWidth: { xs: '100%', sm: '280px' }, // Responsive min-width
-        alignItems: { xs: 'stretch', md: 'center' }, // Stretch on mobile, center content on desktop
-      }}
-    >
-      <Box sx={{ width: '100%' }}> {/* Ensure content inside is full width */}
-        <Typography variant="h6" sx={{ textAlign: { xs: 'left', md: 'center' } }}>
-          Top Rankers
-        </Typography>
-        <List disablePadding sx={{ width: '100%', maxWidth: { md: '300px' } }}> {/* Constrain list width on larger screens */}
-          {rankers.map((ranker) => (
-            <ListItem
-              key={ranker.rank}
-              disableGutters // Remove default horizontal padding
-              sx={{
-                mb: '15px', // Margin bottom for each list item
-                '&:last-child': { mb: 0 }, // No margin for the last item
-                justifyContent: { xs: 'flex-start', md: 'center' }
-              }}
-            >
-              <Typography sx={{ mr: '10px', fontWeight: 'bold', color: 'primary.main', minWidth: '25px', textAlign: 'right' }}>
-                #{ranker.rank}
-              </Typography>
-              <ListItemAvatar>
-                <Avatar alt={ranker.name} src={ranker.pic} sx={{ width: { xs: 35, md: 40 }, height: { xs: 35, md: 40 }, flexShrink: 0 }} />
-              </ListItemAvatar>
-              <ListItemText
-                primary={<Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '13px', md: '14px' } }}>{ranker.name}</Typography>}
-                secondary={<Typography variant="body2" sx={{ color: 'text.secondary', fontSize: { xs: '12px', md: '13px' } }}>Score: {ranker.score}</Typography>}
-              />
-            </ListItem>
-          ))}
-        </List>
-      </Box>
+/* ---------------------------- PAGE --------------------------- */
 
-      <Box sx={{ width: '100%' }}>
-        <Typography variant="h6" sx={{ textAlign: { xs: 'left', md: 'center' } }}>
-          Pass Guaranteed
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: '15px', textAlign: { xs: 'left', md: 'center' } }}>
-          Download the app to get access to 1000+ Mock Tests
-        </Typography>
-        <Box sx={{ display: 'flex', gap: '10px', mb: '15px', flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'center' } }}>
-            {/* Placeholder images for app stores */}
-            <img src="https://via.placeholder.com/120x40?text=Play+Store" alt="Play Store" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
-            <img src="https://via.placeholder.com/120x40?text=App+Store" alt="App Store" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
-        </Box>
-        <TextField fullWidth label="Enter Phone Number" variant="outlined" size="small" type="tel" sx={{ mb: '15px' }} />
-        <Button fullWidth variant="contained">
-          <DownloadIcon sx={{ mr: 1 }} /> Get App Link
-        </Button>
-      </Box>
-    </Paper>
-  );
-};
-
-// 3. Main Page Component
 const Page5 = () => {
-  return (
-    // ThemeProvider applies the custom theme to all Material-UI components within it
-    <ThemeProvider theme={testAnalysisTheme}>
-      {/* CssBaseline applies global CSS resets (like box-sizing, etc.) and global body background */}
-      <CssBaseline />
+  const navigate = useNavigate();
+  const { paperId } = useParams();
+  const { authState } = useUser();
 
-      {/* The fixed "Solutions" button */}
-      <SolutionButton />
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [performanceData, setPerformanceData] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-      <Box
-        sx={{
-          flexGrow: 1, // Allows this Box to take up available vertical space
-          display: 'flex',
-          flexDirection: 'column', // Stack children vertically
-          gap: { xs: '20px', sm: '25px', md: '30px' }, // Responsive vertical spacing between sections
-          maxWidth: '1200px', // Max width for the entire content block
-          mx: 'auto', // Centers the content block horizontally (margin-left/right auto)
-          // Responsive horizontal padding
-          px: { xs: '15px', sm: '15px', md: '20px', lg: '40px' },
-          // Responsive top padding (to account for potential fixed header, and general top spacing)
-          pt: {
-            xs: '60px', // Enough space for mobile fixed button (if it were a header)
-            md: 'calc(70px + 20px)', // Example: if there's a 70px fixed header + 20px spacing
-          },
-          // Responsive bottom padding (to account for fixed solution button on mobile)
-          pb: {
-            xs: '80px', // Space for the fixed solution button at the bottom
-            md: '40px', // Standard bottom padding for desktop
-          },
-        }}
-      >
-        {/* Grid container for the two-column layout */}
-        <Grid container spacing={{ xs: 3, md: 4 }}> {/* Responsive spacing between grid items */}
-          {/* Left Column (Main Content Area) */}
-          <Grid item xs={12} lg={8}> {/* Full width on mobile/tablet, 8/12 width on large screens */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: '20px', sm: '25px', md: '30px' } }}>
-              <OverallPerformance />
-              <SectionalSummary />
-              <ChapterAnalysis />
-              {/* Other sections like Rank Predictor, Compare with Topper, etc., would go here */}
+  const api = useMemo(() => {
+    const instance = axios.create({
+      baseURL: '/api',
+      timeout: 15000,
+    });
+
+    instance.interceptors.request.use(
+      (config) => {
+        if (authState?.accessToken) {
+          config.headers.Authorization = `Bearer ${authState.accessToken}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    instance.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          setError('Session expired. Please login again.');
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return instance;
+  }, [authState?.accessToken]);
+
+  const fetchResults = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setIsOffline(false);
+
+      const response = await api.get(`/study/testpaper/results/${paperId}`);
+      const apiData = response.data;
+      if (!apiData) throw new Error('No results data received from server');
+
+      // Support multiple possible field names
+      const rawQuestions = apiData.questions ?? apiData.questionList ?? [];
+      const normQuestions = normalizeQuestions(rawQuestions);
+      const answersMap = normalizeAnswers(apiData.userAnswers ?? apiData.answers, normQuestions);
+
+      const formattedData = {
+        questions: normQuestions,
+        answers: answersMap,
+        testName: apiData.testName ?? apiData.title ?? "Test Results",
+        timestamp: apiData.timestamp ?? apiData.completedAt ?? new Date().toISOString()
+      };
+
+      const perf = calculatePerformance(formattedData.questions, formattedData.answers);
+
+      setResults(formattedData);
+      setPerformanceData(perf);
+
+      const uid = authState?.user?.id ?? authState?.user?._id ?? 'anon';
+      localStorage.setItem(
+        `test_results_${paperId}_${uid}`,
+        JSON.stringify({ ...formattedData, performance: perf, timestamp: new Date().toISOString() })
+      );
+    } catch (err) {
+      console.error('Error fetching results', err);
+      setIsOffline(true);
+
+      const uid = authState?.user?.id ?? authState?.user?._id ?? 'anon';
+      const localStorageKey = `test_results_${paperId}_${uid}`;
+      const stored = localStorage.getItem(localStorageKey);
+
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const normQuestions = normalizeQuestions(parsed.questions ?? []);
+        const answersMap = normalizeAnswers(parsed.answers, normQuestions);
+        const perf = parsed.performance ?? calculatePerformance(normQuestions, answersMap);
+
+        setResults({ ...parsed, questions: normQuestions, answers: answersMap });
+        setPerformanceData(perf);
+      } else {
+        setError(err?.response?.data?.message || err.message || 'Failed to load results. Please check your connection.');
+
+        if (retryCount < 3) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            // Re-call fetchResults safely
+            (async () => {
+              try {
+                await api.get('/__noop'); // noop to keep closure alive (optional)
+              } catch {setRetryCount}
+              fetchResults();
+            })();
+          }, 3000);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [api, paperId, authState?.user?.id, authState?.user?._id, retryCount]);
+
+  useEffect(() => {
+    if (authState?.accessToken && paperId) {
+      fetchResults();
+    } else if (!authState?.accessToken) {
+      setError('Authentication required. Please login to view results.');
+      setLoading(false);
+    }
+  }, [authState?.accessToken, paperId, fetchResults]);
+
+  const handleRetakeTest = useCallback(() => {
+    navigate(`/page3/${paperId}`);
+  }, [navigate, paperId]);
+
+  const handleGoHome = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
+  /* -------------------------- RENDER -------------------------- */
+
+  if (loading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <StyledContainer>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '80vh',
+            gap: 2
+          }}>
+            <CircularProgress size={60} />
+            <Typography variant="body1" color="text.secondary">
+              Loading your results...
+            </Typography>
+            {retryCount > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                Attempt {retryCount + 1} of 3
+              </Typography>
+            )}
+          </Box>
+        </StyledContainer>
+      </ThemeProvider>
+    );
+  }
+
+  if (error) {
+    return (
+      <ThemeProvider theme={theme}>
+        <StyledContainer>
+          <Box sx={{
+            textAlign: 'center',
+            mt: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3
+          }}>
+            <Typography variant="h5" color="error" gutterBottom>
+              {error.includes('Network') ? 'Connection Issue' : 'Error Loading Results'}
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3, maxWidth: '600px' }}>
+              {error.includes('Network') ? (
+                'Could not connect to the server. Showing cached results if available.'
+              ) : (
+                error
+              )}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={fetchResults}
+                startIcon={<Replay />}
+                disabled={retryCount >= 3}
+              >
+                {retryCount >= 3 ? 'Max Retries Reached' : 'Retry'}
+              </Button>
+              <Button variant="outlined" onClick={handleGoHome}>
+                Go Home
+              </Button>
             </Box>
+          </Box>
+        </StyledContainer>
+      </ThemeProvider>
+    );
+  }
+
+  if (!results || !performanceData) {
+    return (
+      <ThemeProvider theme={theme}>
+        <StyledContainer>
+          <Box sx={{
+            textAlign: 'center',
+            mt: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3
+          }}>
+            <Typography variant="h5" gutterBottom>
+              No Results Available
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3, maxWidth: '600px' }}>
+              We couldn't find any results for this test.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button variant="contained" color="primary" onClick={handleRetakeTest}>
+                Take Test Again
+              </Button>
+              <Button variant="outlined" onClick={handleGoHome}>
+                Go Home
+              </Button>
+            </Box>
+          </Box>
+        </StyledContainer>
+      </ThemeProvider>
+    );
+  }
+
+  const performanceMetrics = [
+    {
+      icon: <BarChart color="primary" sx={{ fontSize: 40, mr: 1 }} />,
+      title: 'Score',
+      value: `${performanceData.obtainedMarks.toFixed(2)}/${performanceData.totalMarks}`,
+      progress: performanceData.percentage,
+      color: 'primary',
+      description: 'Marks obtained vs total'
+    },
+    {
+      icon: <PieChart color="success" sx={{ fontSize: 40, mr: 1 }} />,
+      title: 'Accuracy',
+      value: `${performanceData.accuracy}%`,
+      progress: performanceData.accuracy,
+      color: 'success',
+      description: 'Correct answers from attempted'
+    },
+    {
+      icon: <Timeline color="warning" sx={{ fontSize: 40, mr: 1 }} />,
+      title: 'Attempted',
+      value: `${performanceData.attempted}/${performanceData.totalQuestions}`,
+      progress: (performanceData.attempted / performanceData.totalQuestions) * 100,
+      color: 'warning',
+      description: 'Questions answered'
+    },
+    {
+      icon: <Flag color="info" sx={{ fontSize: 40, mr: 1 }} />,
+      title: 'Performance',
+      value: `${performanceData.percentage}%`,
+      progress: performanceData.percentage,
+      color: 'info',
+      description: 'Overall test performance'
+    }
+  ];
+
+  return (
+    <ThemeProvider theme={theme}>
+      <StyledContainer>
+        <Box sx={{
+          mb: 4,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Button startIcon={<ArrowBack />} onClick={handleGoHome} sx={{ mr: 2 }}>
+            Back to Dashboard
+          </Button>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{ fontWeight: 600, textAlign: 'center', flex: 1, minWidth: '300px' }}
+          >
+            Test Results {isOffline && '(Offline)'}
+          </Typography>
+          <Box sx={{ width: { xs: 0, sm: 150 } }} />
+        </Box>
+
+        {isOffline && (
+          <Alert severity="warning" sx={{ mb: 3, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Warning sx={{ mr: 1 }} />
+              Showing cached results
+            </Box>
+          </Alert>
+        )}
+
+        <Box sx={{ mb: 4 }}>
+          <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              mb: 3,
+              flexWrap: 'wrap',
+              gap: 2
+            }}>
+              <Avatar
+                src={authState?.user?.image}
+                alt={authState?.user?.name}
+                sx={{ width: 60, height: 60, mr: 2 }}
+              />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  {authState?.user?.name || 'Test Taker'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Test: {results.testName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Completed: {new Date(results.timestamp).toLocaleString()}
+                </Typography>
+              </Box>
+              <Button variant="outlined" onClick={fetchResults} startIcon={<Replay />} size="small">
+                Refresh
+              </Button>
+            </Box>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Grid container spacing={3}>
+              {performanceMetrics.map((metric, index) => (
+                <Grid item xs={12} sm={6} lg={3} key={index}>
+                  <PerformanceCard>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        {metric.icon}
+                        <Box>
+                          <Typography variant="h5" fontWeight="bold">
+                            {metric.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {metric.description}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Typography
+                        variant="h3"
+                        sx={{ mb: 2, textAlign: 'center', fontWeight: 700 }}
+                      >
+                        {metric.value}
+                      </Typography>
+                      <LinearProgress
+                        variant="determinate"
+                        value={metric.progress}
+                        // FIX: style the bar color via theme so it works for all palette keys
+                        sx={{
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: 'grey.300',
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 5,
+                            backgroundColor: (t) =>
+                              (t.palette[metric.color] && t.palette[metric.color].main) ||
+                              t.palette.primary.main,
+                          },
+                        }}
+                      />
+                    </CardContent>
+                  </PerformanceCard>
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        </Box>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Question-wise Analysis
+              </Typography>
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Q.No</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Your Answer</TableCell>
+                      <TableCell>Correct Answer</TableCell>
+                      <TableCell>Marks</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {results.questions.map((question, index) => {
+                      const userAnswer = results.answers[question.id];
+                      const isAttempted = !(userAnswer === undefined || userAnswer === null || userAnswer === '');
+                      const isCorrect =
+                        isAttempted && normalizeVal(userAnswer) === normalizeVal(question.correctAnswer);
+
+                      const displayVal = (v) =>
+                        Array.isArray(v) ? v.join(', ') : (v ?? '-');
+
+                      return (
+                        <TableRow key={`q-${question.id || index}`} hover>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              {isAttempted ? (
+                                isCorrect ? <CheckCircle color="success" /> : <Cancel color="error" />
+                              ) : (
+                                <Help color="warning" />
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell>{isAttempted ? displayVal(userAnswer) : 'Not Attempted'}</TableCell>
+                          <TableCell>{displayVal(question.correctAnswer)}</TableCell>
+                          <TableCell>
+                            {isAttempted ? (
+                              isCorrect ? (
+                                <Typography sx={{ color: (t) => t.palette.success.main, fontWeight: 'bold' }}>
+                                  +{num(question.marks?.positive, 1)}
+                                </Typography>
+                              ) : (
+                                <Typography sx={{ color: (t) => t.palette.error.main, fontWeight: 'bold' }}>
+                                  -{Math.abs(num(question.marks?.negative, 0.25))}
+                                </Typography>
+                              )
+                            ) : (
+                              '0'
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
           </Grid>
 
-          {/* Right Column (Sidebar) */}
-          <Grid item xs={12} lg={4}> {/* Full width on mobile/tablet, 4/12 width on large screens */}
-            <RightSidebar />
+          <Grid item xs={12} md={4}>
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Test Summary
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" gutterBottom>
+                  <strong>Test:</strong> {results.testName}
+                </Typography>
+                <Typography variant="body1" gutterBottom>
+                  <strong>Date:</strong> {new Date(results.timestamp).toLocaleString()}
+                </Typography>
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Performance Metrics
+              </Typography>
+              <Box sx={{ '& > *': { mb: 1.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Total Questions:</Typography>
+                  <Typography fontWeight="bold">{performanceData.totalQuestions}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Attempted:</Typography>
+                  <Typography fontWeight="bold">{performanceData.attempted}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Correct:</Typography>
+                  <Typography sx={{ color: (t) => t.palette.success.main }} fontWeight="bold">
+                    {performanceData.correct}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Incorrect:</Typography>
+                  <Typography sx={{ color: (t) => t.palette.error.main }} fontWeight="bold">
+                    {performanceData.incorrect}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Unanswered:</Typography>
+                  <Typography fontWeight="bold">{performanceData.unanswered}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Total Marks:</Typography>
+                  <Typography fontWeight="bold">{performanceData.totalMarks}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Obtained Marks:</Typography>
+                  <Typography fontWeight="bold">{performanceData.obtainedMarks.toFixed(2)}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Percentage:</Typography>
+                  <Typography fontWeight="bold">{performanceData.percentage}%</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1">Accuracy:</Typography>
+                  <Typography fontWeight="bold">{performanceData.accuracy}%</Typography>
+                </Box>
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleRetakeTest}
+                  startIcon={<Replay />}
+                  fullWidth
+                >
+                  Retake Test
+                </Button>
+                <Button variant="outlined" onClick={handleGoHome} fullWidth>
+                  Back to Dashboard
+                </Button>
+              </Box>
+            </Paper>
           </Grid>
         </Grid>
-      </Box>
+      </StyledContainer>
     </ThemeProvider>
   );
 };

@@ -1,4 +1,4 @@
- import {
+import {
   Typography,
   Table,
   TableBody,
@@ -17,45 +17,45 @@
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
- const theme = createTheme({
+const theme = createTheme({
   typography: {
     fontFamily: 'Roboto, sans-serif',
     h3: {  
-        fontSize: '1.5rem',
-        fontWeight: 600,
-        '@media (max-width:768px)': {  
-            fontSize: '1.3rem',
-        },
-        '@media (max-width:480px)': {  
-            fontSize: '1.2rem',
-        },
+      fontSize: '1.5rem',
+      fontWeight: 600,
+      '@media (max-width:768px)': {  
+        fontSize: '1.3rem',
+      },
+      '@media (max-width:480px)': {  
+        fontSize: '1.2rem',
+      },
     },
     h4: {  
-        fontSize: '1.3rem',
-        fontWeight: 600,
-        '@media (max-width:480px)': {  
-            fontSize: '1.2rem',
-        },
+      fontSize: '1.3rem',
+      fontWeight: 600,
+      '@media (max-width:480px)': {  
+        fontSize: '1.2rem',
+      },
     },
     h5: {  
-        fontSize: '1.2rem',
-        fontWeight: 600,
+      fontSize: '1.2rem',
+      fontWeight: 600,
     },
     h6: { 
-        fontSize: '1.2rem',
-        fontWeight: 500,
-        '@media (max-width:480px)': {
-            fontSize: '1rem',
-        },
+      fontSize: '1.2rem',
+      fontWeight: 500,
+      '@media (max-width:480px)': {
+        fontSize: '1rem',
+      },
     },
     body1: {  
-        fontSize: '1rem',
+      fontSize: '1rem',
     },
     body2: { 
-        fontSize: '0.95rem',
-        '@media (max-width:768px)': {
-            fontSize: '0.9rem',
-        },
+      fontSize: '0.95rem',
+      '@media (max-width:768px)': {
+        fontSize: '0.9rem',
+      },
     },
   },
   palette: {
@@ -78,18 +78,17 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
   },
   components: {
     MuiCssBaseline: {
-        styleOverrides: {
-            body: {
-                minHeight: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                fontFamily: 'Roboto, sans-serif',
-                color: '#333333',
-                backgroundColor: '#f0f2f5',
-            }
+      styleOverrides: {
+        body: {
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: 'Roboto, sans-serif',
+          color: '#333333',
+          backgroundColor: '#f0f2f5',
         }
+      }
     },
-   
     MuiPaper: {
       styleOverrides: {
         root: {
@@ -103,48 +102,48 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
       },
     },
     MuiAppBar: {
-        styleOverrides: {
-            root: {
-                boxShadow: 'none',
-                backgroundColor: '#ffffff',
-                borderBottom: '1px solid #dddddd',
-                padding: '15px 20px',
-                '@media (max-width:480px)': {
-                    flexDirection: 'column',
-                    gap: '10px',
-                    padding: '12px 15px',
-                },
-            },
+      styleOverrides: {
+        root: {
+          boxShadow: 'none',
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #dddddd',
+          padding: '15px 20px',
+          '@media (max-width:480px)': {
+            flexDirection: 'column',
+            gap: '10px',
+            padding: '12px 15px',
+          },
         },
+      },
     },
     MuiToolbar: {
-        styleOverrides: {
-            root: {
-                paddingLeft: '0px',  
-                paddingRight: '0px',  
-                minHeight: 'auto',  
-                '@media (min-width:600px)': {  
-                    paddingLeft: '0px',
-                    paddingRight: '0px',
-                },
-            },
+      styleOverrides: {
+        root: {
+          paddingLeft: '0px',  
+          paddingRight: '0px',  
+          minHeight: 'auto',  
+          '@media (min-width:600px)': {  
+            paddingLeft: '0px',
+            paddingRight: '0px',
+          },
         },
+      },
     },
     MuiTableContainer: {
-        styleOverrides: {
-            root: {
-                marginBottom: '30px',
-                overflowX: 'auto',
-                '-webkit-overflow-scrolling': 'touch',
-            }
+      styleOverrides: {
+        root: {
+          marginBottom: '30px',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch', // Fixed the kebab-case warning
         }
+      }
     },
     MuiTableHead: {
-        styleOverrides: {
-            root: {
-                backgroundColor: '#e0f2f7',
-            },
+      styleOverrides: {
+        root: {
+          backgroundColor: '#e0f2f7',
         },
+      },
     },
     MuiTableCell: {
       styleOverrides: {
@@ -158,8 +157,8 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
           whiteSpace: 'nowrap',
           fontSize: '0.95rem',  
           '@media (max-width:768px)': {
-              padding: '10px 12px',
-              fontSize: '0.9rem',
+            padding: '10px 12px',
+            fontSize: '0.9rem',
           },
         },
         body: {
@@ -168,8 +167,8 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
           border: '1px solid #dddddd',
           fontSize: '0.95rem',
           '@media (max-width:768px)': {
-              padding: '10px 12px',
-              fontSize: '0.9rem',
+            padding: '10px 12px',
+            fontSize: '0.9rem',
           },
         },
       },
@@ -186,44 +185,95 @@ const Page4 = () => {
   ];
 
   const currentTheme = useTheme();
-   const isTablet = useMediaQuery(currentTheme.breakpoints.down('md')); 
+  const isTablet = useMediaQuery(currentTheme.breakpoints.down('md')); 
   const isMobile = useMediaQuery(currentTheme.breakpoints.down('sm'));  
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%' }}>
-         <Box sx={{
-            flex: 1,  
-            padding: { xs: '15px', sm: '25px 20px' },
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',  
-            overflowY: 'auto',
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: '100vh', 
+        width: '100%',
+        paddingTop: '60px' // Added padding to account for header
+      }}>
+        <Box sx={{
+          flex: 1,  
+          padding: { xs: '15px', sm: '25px 20px' },
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start',  
+          overflowY: 'auto',
         }}>
-          <Paper sx={{ width: '100%', maxWidth: '900px', marginTop:'100px' }}>
-            <Typography variant={isMobile ? "h5" : isTablet ? "h4" : "h3"} component="h2" sx={{ marginBottom: { xs: '20px', sm: '25px' }, textAlign: 'center' }}>
+          <Paper sx={{ 
+            width: '100%', 
+            maxWidth: '900px',
+            marginTop: { xs: '20px', sm: '40px' } // Adjusted margin for mobile
+          }}>
+            <Typography 
+              variant={isMobile ? "h5" : isTablet ? "h4" : "h3"} 
+              component="h2" 
+              sx={{ 
+                marginBottom: { xs: '20px', sm: '25px' }, 
+                textAlign: 'center' 
+              }}
+            >
               Summary
             </Typography>
 
-            <TableContainer component={Box}>
-              <Table sx={{ minWidth: 600, borderCollapse: 'collapse' }}>
+            <TableContainer>
+              <Table sx={{ 
+                minWidth: 600, 
+                borderCollapse: 'collapse',
+                '@media (max-width:600px)': {
+                  minWidth: '100%'
+                }
+              }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ textAlign: 'left', minWidth: { xs: 150, sm: 'auto' } }}>Section</TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: 100, sm: 'auto' } }}>No. of questions</TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: 80, sm: 'auto' } }}>Answered</TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: 100, sm: 'auto' } }}>Not Answered</TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: 120, sm: 'auto' } }}>Marked for Review</TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: 100, sm: 'auto' } }}>Not Visited</TableCell>
+                    <TableCell sx={{ 
+                      textAlign: 'left', 
+                      minWidth: { xs: '150px', sm: 'auto' } 
+                    }}>
+                      Section
+                    </TableCell>
+                    <TableCell align="center" sx={{ minWidth: { xs: '80px', sm: 'auto' } }}>
+                      No. of questions
+                    </TableCell>
+                    <TableCell align="center" sx={{ minWidth: { xs: '70px', sm: 'auto' } }}>
+                      Answered
+                    </TableCell>
+                    <TableCell align="center" sx={{ minWidth: { xs: '90px', sm: 'auto' } }}>
+                      Not Answered
+                    </TableCell>
+                    <TableCell align="center" sx={{ minWidth: { xs: '110px', sm: 'auto' } }}>
+                      Marked for Review
+                    </TableCell>
+                    <TableCell align="center" sx={{ minWidth: { xs: '90px', sm: 'auto' } }}>
+                      Not Visited
+                    </TableCell>
                   </TableRow>
                 </TableHead>
 
                 <TableBody>
                   {tableData.map((row, index) => (
-                    <TableRow key={row.section} sx={{ backgroundColor: index % 2 === 0 ? 'inherit' : '#f9f9f9' }}>
-                      <TableCell sx={{ textAlign: 'left', fontWeight: 500, color: 'text.primary' }}>
+                    <TableRow 
+                      key={row.section} 
+                      sx={{ 
+                        backgroundColor: index % 2 === 0 ? 'inherit' : '#f9f9f9',
+                        '&:last-child td': {
+                          borderBottom: 'none'
+                        }
+                      }}
+                    >
+                      <TableCell sx={{ 
+                        textAlign: 'left', 
+                        fontWeight: 500, 
+                        color: 'text.primary',
+                        wordBreak: 'break-word'
+                      }}>
                         {row.section}
                       </TableCell>
                       <TableCell align="center">{row.questions}</TableCell>
@@ -246,22 +296,41 @@ const Page4 = () => {
             </TableContainer>
 
             <Box sx={{ 
-                display: 'flex',
-                justifyContent: 'center',
-                gap: { xs: '10px', sm: '15px', md: '20px' },
-                marginTop: '20px',
-                flexDirection: 'row', 
-                flexWrap: 'wrap',  
-                width: '100%', 
+              display: 'flex',
+              justifyContent: 'center',
+              gap: { xs: '10px', sm: '15px', md: '20px' },
+              marginTop: '30px',
+              flexWrap: 'wrap',
+              paddingBottom: '10px'
             }}>
-              <Button variant="contained" color="secondary">Tests</Button>
-              <Button variant="contained" classes={{ contained: 'submitButton' }} sx={{color:'white', bgcolor:'#f44336'}}>Submit</Button>
+              <Button 
+                variant="contained" 
+                color="secondary"
+                sx={{
+                  minWidth: { xs: '120px', sm: '150px' }
+                }}
+              >
+                Tests
+              </Button>
+              <Button 
+                variant="contained" 
+                sx={{
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  minWidth: { xs: '120px', sm: '150px' },
+                  '&:hover': {
+                    backgroundColor: '#d32f2f'
+                  }
+                }}
+              >
+                Submit
+              </Button>
             </Box>
           </Paper>
         </Box>
-</Box>
+      </Box>
     </ThemeProvider>
   );
 }
-export default Page4;
 
+export default Page4;

@@ -18,7 +18,7 @@ function App() {
         element: <Page1 />,
        
       },
-        {
+      {
         path: "/page2/:paperId",
         element: <Page2 />,
       },
@@ -31,7 +31,7 @@ function App() {
         element: <Page4 />,
       },
       {
-        path: "/page5",
+        path: "/result/:paperId",
         element: <Page5 />,
       },
       {
