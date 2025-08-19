@@ -1,308 +1,254 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import {
-  createTheme,
-  ThemeProvider,
-  CssBaseline,
-  AppBar,
-  Toolbar,
-  Typography,
-  Box,
-  Button,
-  Container,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Checkbox,
-  FormControlLabel,
+  Typography, Box, styled, FormControl, InputLabel, MenuItem,
+  Select, Button, FormControlLabel, Checkbox, useTheme,
+  useMediaQuery, CssBaseline, ThemeProvider, CircularProgress, Alert
 } from "@mui/material";
-import Header from "../component/Header";
+import Header from '../component/Header'
+import { useUser } from "../context/UserContext";
 
-// 1. Define the Theme with Square Borders
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: "#4285f4", // Google Blue
-      contrastText: "#ffffff",
-    },
-    background: {
-      default: "#f8f9fa",
-      paper: "#ffffff",
-    },
-    text: {
-      primary: "#333333",
-      secondary: "#666666",
-    },
-    action: {
-      disabledBackground: "#e0e0e0",
-      disabled: "#666666",
-    },
-  },
-  typography: {
-    fontFamily: "Roboto, Arial, sans-serif",
-    h1: {
-      fontSize: "18px",
-      fontWeight: 500,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      lineHeight: 1.2,
-      flexGrow: 1,
-      "@media (max-width: 992px)": { fontSize: "17px" },
-      "@media (max-width: 768px)": {
-        fontSize: "15px",
-        whiteSpace: "normal",
-        textOverflow: "unset",
-      },
-      "@media (max-width: 480px)": { fontSize: "14px" },
-    },
-    h2: {
-      fontSize: "1.6rem",
-      fontWeight: 600,
-      marginBottom: "20px",
-      "@media (max-width: 992px)": { fontSize: "1.5rem" },
-      "@media (max-width: 768px)": { fontSize: "1.3rem", marginBottom: "15px" },
-      "@media (max-width: 480px)": { fontSize: "1.2rem" },
-    },
-  },
-  spacing: 8,
-  // --- KEY CHANGE: Set border radius to 0 for square corners ---
-  shape: {
-    borderRadius: 0,
-  },
-  // Custom variables for fixed heights
-  custom: {
-    headerHeight: { desktop: "60px", mobile: "55px" },
-    footerHeight: { desktop: "80px", mobile: "65px" },
-  },
-});
+const Scroll = styled(Box)(({ theme }) => ({
+  height: "auto",
+  maxHeight: "180px",
+  overflowY: "auto",
+  backgroundColor: theme.palette.background.default,
+  padding: theme.spacing(3),
+  borderRadius: theme.shape.borderRadius,
+  border: `1px solid ${theme.palette.divider}`,
+  boxShadow: theme.shadows[1],
+}));
+
+
+const generateInstructions = (details) => {
+  
+  const parseSections = (sectionsString) => {
+    if (!sectionsString || typeof sectionsString !== 'string' || sectionsString.trim() === '') {
+      return [];
+    }
+    return sectionsString.split('@@@');
+  };
+
+  const sections = parseSections(details.sections);
+  const sectionCount = sections.length > 0 ? sections.length : 1;
+  
+  
+  const stripHtml = (html) => html ? html.replace(/<\/?[^>]+(>|$)/g, "") : "";
+  const additionalInstructions = stripHtml(details.details);
+
+  const dynamicInstructions = [
+    `The test contains ${sectionCount} section(s) and a total of ${details.questions || 'several'} questions.`,
+    "Each question has 4 options out of which only one is correct.",
+    `You have to finish the test in ${details.duration || 'the given'} minutes.`,
+    "You will be awarded marks for each correct answer and negative marks may be deducted for wrong answers.",
+  ];
+
+ 
+  if (additionalInstructions) {
+    dynamicInstructions.push(additionalInstructions);
+  }
+
+  return {
+    title: "Read the following instructions carefully.",
+    instructions: dynamicInstructions,
+    languageLabel: "Choose Your Default Language",
+    languageNote: "Please note all questions will appear in your default language. This language can be changed for a particular question later on.",
+    declaration: "Declaration:",
+    declarationText: "I have read all the instructions carefully and have understood them. I agree not to cheat or use unfair means in this examination...",
+    previousButton: "Previous",
+    readyButton: "I am ready to Begin",
+    duration: `Duration: ${details.duration || 'N/A'} Mins`,
+    maxMarks: `Maximum Marks: ${details.marks || 'N/A'}`,
+  };
+};
+
 
 const Page2 = () => {
+  const { paperId } = useParams();
   const navigate = useNavigate();
+  const { authState } = useUser();
+  const theme = useTheme();
 
-  const [declarationChecked, setDeclarationChecked] = useState(false);
-  const [language, setLanguage] = useState("select");
+  
+  const [testDetails, setTestDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const [sourceInstructions, setSourceInstructions] = useState(null);
+  const [displayText, setDisplayText] = useState(null);
+  
+  const [language, setLanguage] = useState("english");
+  const [isChecked, setIsChecked] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
-  const handleCheckboxChange = (event) => {
-    setDeclarationChecked(event.target.checked);
-  };
 
-  const handleLanguageChange = (event) => {
-    setLanguage(event.target.value);
-  };
+useEffect(() => {
+  const fetchTestDetails = async () => {
+    setLoading(true);
+    setError(null);
 
-  const handleReadyClick = () => {
-    if (!declarationChecked) {
-    } else {
-      alert("Starting the test!");
-      navigate("/page3");
+    try {
+      const token = authState.accessToken;
+      
+      const response = await axios.get(`/api/testpaper/${paperId}`, {
+        headers: { 'Authorization': token } 
+      });
+      
+      const details = response.data;
+      setTestDetails(details);
+
+      const generated = generateInstructions(details);
+      setSourceInstructions(generated);
+      setDisplayText(generated);
+
+    } catch (e) {
+      setError(e.response?.data?.message || "Failed to load test instructions.");
+    } finally {
+      setLoading(false);
     }
   };
+
+
+  if (authState && authState.accessToken && paperId) {
+    fetchTestDetails();
+  } 
+
+  else if (authState && authState.accessToken === null) {
+    setError("You must be logged in to view instructions.");
+    setLoading(false);
+  }
+
+
+}, [paperId, authState]);
+
+  useEffect(() => {
+    const translateContent = async (text) => {
+      if (language === 'english' || !text) return text;
+      try {
+        const response = await axios.post("https://libretranslate.de/translate", {
+          q: text, source: "en", target: "hi", format: "text"
+        }, { headers: { "Content-Type": "application/json" } });
+        return response.data?.translatedText || text;
+      } catch (error) {
+        console.error("Translation failed:", error);
+        return text;
+      }
+    };
+    
+    const updateTranslations = async () => {
+      if (!sourceInstructions) return;
+      if (language === "english") {
+        setDisplayText(sourceInstructions);
+        return;
+      }
+
+      setIsTranslating(true);
+      try {
+        const translated = { ...sourceInstructions };
+        for (const key in translated) {
+          const value = translated[key];
+          if (Array.isArray(value)) {
+            translated[key] = await Promise.all(value.map(item => translateContent(item)));
+          } else if (typeof value === 'string') {
+            translated[key] = await translateContent(value);
+          }
+        }
+        setDisplayText(translated);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
+    
+    updateTranslations();
+  }, [language, sourceInstructions]);
+
+
+  const handleReadyClick = () => {
+    if (isChecked) {
+      navigate(`/page3/${paperId}`);
+    }
+  };
+
+ 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
+
+ 
+  if (!displayText) {
+    return null; 
+  }
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh",minWidth:'99vw', bgcolor: "background.default" }}>
         <Header />
-
-        {/* Main Content */}
-        <Box
-          component="main"
-          sx={{
-            flex: 1,
-            overflowY: "auto",
-            p: { xs: 2, sm: 3, md: 4 },
-            mt: {
-              xs: theme.custom.headerHeight.mobile,
-              md: theme.custom.headerHeight.desktop,
-            },
-            mb: {
-              xs: theme.custom.footerHeight.mobile,
-              md: theme.custom.footerHeight.desktop,
-            },
-          }}
-        >
-          <Container
-            maxWidth="lg"
-            sx={{
-              backgroundColor: "background.paper",
-              boxShadow: "0 1px 5px rgba(0,0,0,0.05)",
-              p: { xs: 2, md: 4 },
-              borderRadius: 0, // Ensure container is square
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 2,
-                pb: 2,
-                mb: 3,
-                borderBottom: "1px dashed #e0e0e0",
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Duration: 60 Mins
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Maximum Marks: 200
-              </Typography>
+        <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, mt: '40px' }}>
+          <Box sx={{  width: '100%', bgcolor: 'background.paper', boxShadow: 2, borderRadius: 1, p: { xs: 2, md: 4 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+              <Typography variant="body2" color="text.secondary">{displayText.duration}</Typography>
+              <Typography variant="body2" color="text.secondary">{displayText.maxMarks}</Typography>
             </Box>
 
-            <Typography variant="h2" color="text.primary">
-              Read the following instructions carefully.
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", borderBottom: `1px solid ${theme.palette.divider}`, pb: 1 }}>
+              {displayText.title}
             </Typography>
 
-            <Box component="ol" sx={{ pl: 4, mb: 3, lineHeight: 1.7 }}>
-              <li>
-                <Typography>
-                  The test contains 4 sections having 100 questions.
-                </Typography>
-              </li>
-              <li>
-                <Typography>
-                  Each question has 4 options out of which only one is correct.
-                </Typography>
-              </li>
-              <li>
-                <Typography>
-                  You have to finish the test in 60 minutes.
-                </Typography>
-              </li>
-              <li>
-                <Typography>
-                  You will be awarded 2 marks for each correct answer and 0.5
-                  will be deducted for wrong answer.
-                </Typography>
-              </li>
-              <li>
-                <Typography>
-                  There is no negative marking for the questions that you have
-                  not attempted.
-                </Typography>
-              </li>
-              <li>
-                <Typography>
-                  You can write this test only once. Make sure that you complete
-                  the test before you submit the test and/or close the browser.
-                </Typography>
-              </li>
+            <Box component="ol" sx={{ listStyleType: "decimal", pl: { xs: 2, md: 4 }, color: "text.secondary", '& li': { mb: 1 } }}>
+              {displayText.instructions.map((item, index) => (
+                <Typography component="li" key={index}>{item}</Typography>
+              ))}
             </Box>
 
-            <Box
-              sx={{
-                p: 2,
-                backgroundColor: "background.default",
-                border: "1px solid #e0e0e0",
-                mb: 3,
-                borderRadius: 0,
-              }}
-            >
-              <FormControl fullWidth>
-                <InputLabel id="language-select-label">
-                  Choose your default language:
-                </InputLabel>
-                <Select
-                  labelId="language-select-label"
-                  id="language-select"
-                  value={language}
-                  label="Choose your default language:"
-                  onChange={handleLanguageChange}
-                  sx={{ maxWidth: { xs: "100%", md: 280 } }}
-                >
-                  <MenuItem value="select">--Select--</MenuItem>
+            <Scroll sx={{ mt: 4 }}>
+              <Typography variant="body1" sx={{ fontWeight: "bold", mb: 2, color: "text.primary" }}>
+                {displayText.languageLabel}
+              </Typography>
+              <FormControl fullWidth sx={{ maxWidth: { sm: 300 }, mb: 2 }}>
+                <InputLabel>Language</InputLabel>
+                <Select value={language} onChange={(e) => setLanguage(e.target.value)} disabled={isTranslating}>
                   <MenuItem value="english">English</MenuItem>
                   <MenuItem value="hindi">Hindi</MenuItem>
                 </Select>
+                {isTranslating && <CircularProgress size={24} sx={{ position: 'absolute', right: 40, top: '50%', transform: 'translateY(-50%)' }} />}
               </FormControl>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 1, fontSize: "0.85rem" }}
-              >
-                Please note all questions will appear in your default language.
-                This language can be changed for a particular question later on.
-              </Typography>
-            </Box>
+              <Typography variant="body2" color="text.secondary">{displayText.languageNote}</Typography>
+            </Scroll>
 
-            <Box>
-              <Typography
-                variant="h6"
-                component="p"
-                sx={{ fontWeight: 500, fontSize: "1.1rem", mb: 2 }}
-              >
-                Declaration:
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2, color: "text.primary" }}>
+                {displayText.declaration}
               </Typography>
               <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={declarationChecked}
-                    onChange={handleCheckboxChange}
-                    name="declaration-agree"
-                    color="primary"
-                    sx={{ alignSelf: "flex-start", mt: -0.5, mr: 1 }}
-                  />
-                }
-                label="I have read all the instructions carefully and have understood them. I agree not to cheat or use unfair means in this examination. I understand that using unfair means of any sort for my own or someone else's advantage will lead to my immediate disqualification. The decision of Testbook.com will be final in these matters and cannot be appealed."
-                sx={{ color: "text.secondary", alignItems: "flex-start" }}
+                control={<Checkbox checked={isChecked} onChange={(e) => setIsChecked(e.target.checked)} />}
+                label={<Typography variant="body2" color="text.secondary">{displayText.declarationText}</Typography>}
+                sx={{ alignItems: "flex-start", m: 0 }}
               />
             </Box>
-          </Container>
+          </Box>
         </Box>
-
-        {/* Footer */}
-        <AppBar
-          position="fixed"
-          color="background"
-          elevation={1}
-          sx={{
-            top: "auto",
-            bottom: 0,
-            height: {
-              xs: theme.custom.footerHeight.mobile,
-              md: theme.custom.footerHeight.desktop,
-            },
-            borderTop: "1px solid #e0e0e0",
-            boxShadow: "0 -2px 5px rgba(0,0,0,0.1)",
-          }}
-        >
-          <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-            <Box>
-              <Button
-              onClick={() =>navigate('/')}
-                variant="outlined"
-                sx={{
-                  borderColor: "#e0e0e0",
-                  color: "text.primary",
-                  "&:hover": {
-                    backgroundColor: "#e9ecef",
-                    borderColor: "#e0e0e0",
-                  },
-                  fontSize: { xs: "0.8rem", sm: "0.9rem" },
-                  padding: { xs: "8px 10px", sm: "10px 15px" },
-                }}
-              >
-                Previous
-              </Button>
-            </Box>
-            <Box>
-              <Button
-                variant="contained"
-                color="primary"
-                disabled={!declarationChecked}  
-                onClick={handleReadyClick}
-                sx={{
-                  fontSize: { xs: "0.75rem", sm: "0.9rem" },
-                  padding: { xs: "8px 8px", sm: "10px 15px" },
-                }}
-              >
-                I am ready to begin
-              </Button>
-            </Box>
-          </Toolbar>
-        </AppBar>
+        <Box sx={{ position: "sticky", bottom: 0, display: "flex", justifyContent: "space-between", bgcolor: "background.paper", p: 2, boxShadow: 3, borderTop: `1px solid ${theme.palette.divider}` }}>
+          <Button variant="outlined" onClick={() => navigate('/select-test')} disabled={isTranslating}>
+            {displayText.previousButton}
+          </Button>
+          <Button variant="contained" color="primary" onClick={handleReadyClick} disabled={!isChecked || isTranslating}>
+            {displayText.readyButton}
+          </Button>
+        </Box>
       </Box>
     </ThemeProvider>
   );

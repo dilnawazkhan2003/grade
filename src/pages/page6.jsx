@@ -234,7 +234,7 @@ const SolutionBox = styled(Box)(({ theme }) => ({
 
 const Page6 = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(3600);
+  const [TimeLeft, setTimeLeft] = useState(3600);
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [answers, setAnswers] = useState({});
   const [showSolution, setShowSolution] = useState({});
@@ -265,7 +265,7 @@ const Page6 = () => {
     return () => clearInterval(timerInterval);
   }, []);
 
-  const formatTime = (seconds) => {
+  const FormatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -417,7 +417,6 @@ const Page6 = () => {
   return (
     <ThemeProvider theme={theme}>
       <StyledContainer>
-        <Header2 />
         <MainContainer>
           <LeftPanel>
             <ScrollableContent>
