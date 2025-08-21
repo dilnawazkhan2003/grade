@@ -42,7 +42,10 @@ import {
 import { styled } from "@mui/material/styles";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 
-/* =============================== Error Boundary =============================== */
+
+const API_BASE_URL = "https://test.iblib.com";
+
+
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
   static getDerivedStateFromError(error) {
@@ -253,12 +256,39 @@ const stripHTML = (html) => {
     .trim();
 };
 
+// ==========================================================
+// 2. MODIFIED: The normalizeQuestion function is updated.
+// ==========================================================
 /** Normalize question coming from API to a stable shape our UI can rely on */
 const normalizeQuestion = (raw, idx, sections) => {
   const id =
     raw.id ?? raw.qid ?? raw._id ?? raw.questionId ?? raw.uuid ?? String(idx);
 
-  const qText = stripHTML(raw.question ?? raw.q ?? raw.text ?? "");
+  // Get the raw HTML from the question to preserve image tags
+  let qHTML = raw.question ?? raw.q ?? raw.text ?? "";
+
+  // Process the HTML to construct full image URLs
+  if (qHTML && qHTML.includes("<img")) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(qHTML, "text/html");
+      const images = doc.querySelectorAll("img");
+      images.forEach((img) => {
+        const src = img.getAttribute("src");
+        // Check if the src is a relative path
+        if (src && !/^(https?:|data:)/.test(src)) {
+          // Construct the full URL and update the src attribute
+          const newSrc = new URL(src, API_BASE_URL).href;
+          img.setAttribute("src", newSrc);
+        }
+      });
+      qHTML = doc.body.innerHTML;
+    } catch (e) {
+      console.error("Failed to parse question HTML for image processing:", e);
+    }
+  }
+
+  // Options are still stripped of HTML for simplicity
   const rawOptions = raw.options ?? raw.choices ?? raw.opts ?? [];
   const options = Array.isArray(rawOptions)
     ? rawOptions
@@ -317,7 +347,7 @@ const normalizeQuestion = (raw, idx, sections) => {
     ...raw,
     id,
     qid: raw.qid ?? id, // keep qid for save API
-    question: qText,
+    question: qHTML, // Use the processed HTML
     options,
     marks,
     kind, // "single" | "multiple" | "text"
@@ -649,9 +679,26 @@ const QuestionContent = React.memo(
         </Box>
 
         <Box>
-          <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-            {question.question}
-          </Typography>
+          {/* ========================================================== */}
+          {/* 3. MODIFIED: This renders the question as HTML */}
+          {/* ========================================================== */}
+          <Box
+            component="div"
+            sx={{
+              lineHeight: 1.8,
+              typography: "body1",
+              "& p": { marginBlockStart: "1em", marginBlockEnd: "1em" },
+              "& img": {
+                maxWidth: "100%",
+                height: "auto",
+                display: "block",
+                my: 2,
+                borderRadius: 1,
+                boxShadow: 1,
+              },
+            }}
+            dangerouslySetInnerHTML={{ __html: question.question || "" }}
+          />
 
           {/* SINGLE ANSWER (RADIO) */}
           {question.kind === "single" && question.options?.length > 0 && (

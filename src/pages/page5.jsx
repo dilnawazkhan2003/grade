@@ -1,4 +1,4 @@
-import  { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useUser } from "../context/UserContext";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
@@ -12,7 +12,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
 } from "@mui/material";
 import { styled, createTheme, ThemeProvider } from "@mui/material/styles";
 
@@ -41,12 +40,15 @@ const StyledListItem = styled(ListItem, {
   "& .MuiListItemIcon-root": {
     minWidth: "40px",
   },
+  "& .MuiListItemText-root": {
+    wordBreak: "break-word",
+  }
 }));
 
 const Page5 = () => {
   const { paperId } = useParams();
   const navigate = useNavigate();
-  const { authState, setAuthState } = useUser();
+  const { authState } = useUser();
 
   const [questions, setQuestions] = useState([]);
   const [userAnswers, setUserAnswers] = useState({});
@@ -65,20 +67,13 @@ const Page5 = () => {
     return instance;
   }, [authState]);
 
-// In Page5.jsx
+  const stripHTML = useCallback((html) => {
+    const inputAsString = String(html ?? '');
+    // This regex replaces all HTML tags (e.g., <br>, <strong>) with an empty string.
+    return inputAsString.replace(/<[^>]*>/g, '').trim();
+  }, []);
 
-const stripHTML = useCallback((html) => {
-  // Add this check at the beginning
-  if (!html) {
-    return ""; // Return an empty string if the input is null or undefined
-  }
-  
-  // This code will now only run if 'html' is a valid string
-  return html.replace(/<img[^>]*>/gi, "").replace(/<\/?([^>]+)>/g, "").trim();
-}, []);
-// In Page5.jsx
-
-const fetchResults = useCallback(async () => {
+  const fetchResults = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -86,7 +81,7 @@ const fetchResults = useCallback(async () => {
         const fetchedQuestions = questionsRes.data.map((q) => ({
             ...q,
             question: stripHTML(q.question),
-            options: (q.options || []).map((opt) => stripHTML(opt)).filter(Boolean),
+            options: (q.options || []).map((opt) => stripHTML(opt)),
         }));
         setQuestions(fetchedQuestions);
 
@@ -96,47 +91,46 @@ const fetchResults = useCallback(async () => {
         let calculatedScore = 0;
         fetchedQuestions.forEach((q) => {
             const userAnswer = storedAnswers[q.id];
-            
-            // The correct answer from the API might be a single string or a comma-separated string for checkboxes
-            const correctAnswer = q.answers[0]; 
+            const correctAnswerText = q.answers && q.answers.length > 0 ? q.answers[0] : undefined;
 
-            if (!userAnswer || !correctAnswer) {
-                return; // Skip if there's no user answer or correct answer
+            if (userAnswer === undefined || correctAnswerText === undefined) {
+                return;
             }
 
             let isCorrect = false;
 
-            // --- THIS IS THE NEW LOGIC ---
             if (q.questionType === 'checkbox') {
-                // For checkboxes, both answers must be treated as arrays
-                const userAnswerArray = Array.isArray(userAnswer) ? userAnswer.sort() : [userAnswer];
-                // The correct answer from API might be "Red,Blue", so we split it into an array
-                const correctAnswerArray = correctAnswer.split(',').map(item => item.trim()).sort();
-
-                // Compare the sorted arrays by converting them to strings
-                if (userAnswerArray.join(',') === correctAnswerArray.join(',')) {
+                if (Array.isArray(userAnswer)) {
+                    const userAnswerTexts = userAnswer.map(index => q.options[index]).sort();
+                    const correctAnswerTexts = correctAnswerText.split(',').map(item => item.trim()).sort();
+                    if (JSON.stringify(userAnswerTexts) === JSON.stringify(correctAnswerTexts)) {
+                        isCorrect = true;
+                    }
+                }
+            } else if (q.questionType === 'radio') {
+                const userAnswerText = q.options[userAnswer];
+                if (userAnswerText === correctAnswerText) {
                     isCorrect = true;
                 }
             } else {
-                // For radio or input, it's a simple string comparison
-                if (stripHTML(userAnswer) === stripHTML(correctAnswer)) {
+                if (String(userAnswer).trim() === String(correctAnswerText).trim()) {
                     isCorrect = true;
                 }
             }
 
             if (isCorrect) {
-                calculatedScore += 1;
+                calculatedScore += (q.marks?.positive || 1);
             }
         });
         setScore(calculatedScore);
 
     } catch (e) {
-        setError(e.response?.data?.message || "Failed to fetch results.");
+        setError(e.message || "Failed to fetch results.");
         console.error("Error fetching results:", e);
     } finally {
         setLoading(false);
     }
-}, [api, paperId, stripHTML]);
+  }, [api, paperId, stripHTML]);
 
   useEffect(() => {
     if (authState?.accessToken && paperId) {
@@ -145,10 +139,8 @@ const fetchResults = useCallback(async () => {
   }, [authState, paperId, fetchResults]);
 
   const handleRetry = () => {
-    setAuthState(null);
-     navigate(`/page3/${paperId}`)
+    navigate(`/page3/${paperId}`);
   };
-
 
   if (loading) {
     return (
@@ -162,13 +154,12 @@ const fetchResults = useCallback(async () => {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>
         <Alert severity="error">{error}</Alert>
+        <Button onClick={fetchResults} sx={{ mt: 2 }}>Try Again</Button>
       </Box>
     );
   }
 
-  // In Page5.jsx
-
-return (
+  return (
     <ThemeProvider theme={theme}>
       <Box sx={{
           position: 'fixed', top: 0, left: 0, width: '100%',
@@ -192,26 +183,26 @@ return (
               <List sx={{ width: "100%", bgcolor: "transparent" }}>
                 {questions.map((q, index) => {
                   const userAnswer = userAnswers[q.id];
-                  const correctAnswer = q.answers[0];
-
-                  // --- NEW, CORRECT LOGIC TO DETERMINE IF THE ANSWER IS CORRECT ---
+                  const correctAnswerText = q.answers && q.answers.length > 0 ? q.answers[0] : "N/A";
+                  
                   let isCorrect = false;
-                  if (userAnswer && correctAnswer) {
-                    if (q.questionType === 'checkbox') {
-                      const userAnswerArray = Array.isArray(userAnswer) ? userAnswer.sort() : [userAnswer];
-                      const correctAnswerArray = correctAnswer.split(',').map(item => item.trim()).sort();
-                      if (userAnswerArray.join(',') === correctAnswerArray.join(',')) {
-                        isCorrect = true;
-                      }
+                  let displayUserAnswer = "Not Answered";
+
+                  if (userAnswer !== undefined && correctAnswerText) {
+                    if (q.questionType === 'checkbox' && Array.isArray(userAnswer)) {
+                        const userAnswerTexts = userAnswer.map(i => q.options[i]).sort();
+                        const correctAnswerTexts = correctAnswerText.split(',').map(item => item.trim()).sort();
+                        if (JSON.stringify(userAnswerTexts) === JSON.stringify(correctAnswerTexts)) isCorrect = true;
+                        displayUserAnswer = userAnswerTexts.join(', ');
+                    } else if (q.questionType === 'radio') {
+                        const userAnswerText = q.options[userAnswer];
+                        if (userAnswerText === correctAnswerText) isCorrect = true;
+                        displayUserAnswer = userAnswerText;
                     } else {
-                      if (stripHTML(userAnswer) === stripHTML(correctAnswer)) {
-                        isCorrect = true;
-                      }
+                        if (String(userAnswer).trim() === String(correctAnswerText).trim()) isCorrect = true;
+                        displayUserAnswer = String(userAnswer);
                     }
                   }
-                  
-                  // --- NEW HELPER TO DISPLAY ANSWERS CORRECTLY ---
-                  const displayUserAnswer = Array.isArray(userAnswer) ? userAnswer.join(', ') : userAnswer;
 
                   return (
                     <StyledListItem key={q.id} correct={isCorrect}>
@@ -223,27 +214,24 @@ return (
                         }
                         secondary={
                           <Box sx={{ mt: 1 }}>
-                            {userAnswer !== undefined ? (
-                              <Typography variant="body2" color={isCorrect ? "text.primary" : "error.main"}>
-                                <b>Your Answer:</b> {displayUserAnswer}
-                              </Typography>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                <b>You did not answer this question.</b>
-                              </Typography>
-                            )}
+                            <Typography variant="body2" color={isCorrect ? "text.primary" : "error.main"}>
+                              <b>Your Answer:</b> {displayUserAnswer || 'Not Answered'}
+                            </Typography>
                             {!isCorrect && (
                               <Typography variant="body2" color="success.main">
-                                <b>Correct Answer:</b> {correctAnswer}
+                                <b>Correct Answer:</b> {stripHTML(correctAnswerText)}
                               </Typography>
                             )}
                             {q.explanation && (
-                              <Box>
-                                <Typography variant="body2" color="text.secondary" dangerouslySetInnerHTML={{ __html: `<b>Explanation:</b> ${q.explanation}` }} />
+                              <Box mt={1} p={1} bgcolor="grey.200" borderRadius={1}>
+                                <Typography variant="body2" color="text.secondary">
+                                  <b>Explanation:</b> {stripHTML(q.explanation)}
+                                </Typography>
                               </Box>
                             )}
                           </Box>
                         }
+                        secondaryTypographyProps={{ component: 'div' }}
                       />
                     </StyledListItem>
                   );
@@ -251,14 +239,9 @@ return (
               </List>
 
               <Box sx={{mt: 4, display: 'flex', gap: 2, justifyContent: 'center'}}>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={() => {
-                    navigate(`/page4/${paperId}`); // Go to summary, which will log out
-                  }}
-                >
-                  View Summary
+                {/* THIS IS THE MODIFIED LINE */}
+                <Button variant="contained" color="secondary" onClick={() => navigate('/page4')}>
+                  Back to Dashboard
                 </Button>
                 <Button variant="contained" color="primary" onClick={handleRetry}>
                   Retry Test
