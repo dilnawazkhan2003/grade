@@ -1,11 +1,22 @@
-import React from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import { useUser } from "../context/UserContext";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import Header2 from "../component/Header2";
+
 import {
   Box,
   Typography,
   Button,
   Radio,
+  RadioGroup,
+  Checkbox,
   FormControlLabel,
   Select,
   MenuItem,
@@ -17,6 +28,7 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
+  TextField,
 } from "@mui/material";
 import {
   Language,
@@ -29,21 +41,16 @@ import {
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
-import Header2 from "../component/Header2"
-import axios from "axios";
-import { useNavigate, useParams } from "react-router-dom";
 
+/* =============================== Error Boundary =============================== */
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
-
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
-
   componentDidCatch(error, errorInfo) {
     console.error("Error caught by boundary:", error, errorInfo);
   }
-
   render() {
     if (this.state.hasError) {
       return (
@@ -58,6 +65,8 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
+/* =============================== Theme =============================== */
 const theme = createTheme({
   palette: {
     primary: { main: "#2196F3" },
@@ -72,6 +81,7 @@ const theme = createTheme({
   },
 });
 
+/* =============================== Styled =============================== */
 const StyledContainer = styled(Box)(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
@@ -83,24 +93,24 @@ const StyledContainer = styled(Box)(({ theme }) => ({
 const MainContainer = styled(Box)(({ theme }) => ({
   display: "flex",
   flexGrow: 1,
-  height: "auto", 
+  height: "auto",
   marginBottom: "70px",
   [theme.breakpoints.down("md")]: {
     flexDirection: "column",
-    height: "auto", 
+    height: "auto",
     marginBottom: 0,
   },
 }));
 
 const LeftPanel = styled(Box)(({ theme }) => ({
-  width: "1110px", 
+  width: "1110px",
   flexShrink: 0,
   backgroundColor: theme.palette.background.paper,
   borderRight: `1px solid ${theme.palette.divider}`,
   display: "flex",
   flexDirection: "column",
-  height: "auto", 
-  minHeight: "fit-content", 
+  height: "auto",
+  minHeight: "fit-content",
   overflow: "hidden",
   position: "relative",
   zIndex: 1,
@@ -108,9 +118,10 @@ const LeftPanel = styled(Box)(({ theme }) => ({
     flex: 1,
     width: "100%",
     borderRight: "none",
-    height: "auto", // Also adjust for mobile
+    height: "auto",
   },
 }));
+
 const ScrollableContent = styled(Box)(({ theme }) => ({
   flexGrow: 1,
   overflowY: "auto",
@@ -144,7 +155,7 @@ const RightSidebar = styled(Box)(({ theme, open }) => ({
   },
 }));
 
-const SidebarOverlay = styled(Box)(({ open }) => ({
+const SidebarOverlay = styled(Box)(({ theme, open }) => ({
   display: open ? "flex" : "none",
   position: "fixed",
   top: 0,
@@ -228,6 +239,144 @@ const QuestionNumBox = styled(Box, {
   }),
 }));
 
+/* =============================== Helpers =============================== */
+const num = (v, d = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+};
+
+const stripHTML = (html) => {
+  if (!html) return "";
+  return html
+    .replace(/<img[^>]*>/gi, "")
+    .replace(/<\/?([^>]+)>/g, "")
+    .trim();
+};
+
+/** Normalize question coming from API to a stable shape our UI can rely on */
+const normalizeQuestion = (raw, idx, sections) => {
+  const id =
+    raw.id ?? raw.qid ?? raw._id ?? raw.questionId ?? raw.uuid ?? String(idx);
+
+  const qText = stripHTML(raw.question ?? raw.q ?? raw.text ?? "");
+  const rawOptions = raw.options ?? raw.choices ?? raw.opts ?? [];
+  const options = Array.isArray(rawOptions)
+    ? rawOptions
+        .map((o) =>
+          typeof o === "string"
+            ? stripHTML(o)
+            : stripHTML(o?.text ?? o?.label ?? "")
+        )
+        .filter(Boolean)
+    : [];
+
+  // marks (positive/negative)
+  const m = raw.marks ?? {};
+  const marks = {
+    positive: num(
+      m.positive ?? m.pos ?? raw.positiveMarks ?? raw.mark ?? raw.marksPositive,
+      1
+    ),
+    negative: num(
+      m.negative ??
+        m.neg ??
+        raw.negativeMarks ??
+        raw.negMark ??
+        raw.marksNegative,
+      0.25
+    ),
+  };
+
+  // figure out question kind
+  const t = String(
+    raw.type ?? raw.questionType ?? raw.answerType ?? ""
+  ).toLowerCase();
+
+  const allowMultiple =
+    raw.allowMultiple === true ||
+    /multiple|multi|checkbox/.test(t) ||
+    (Array.isArray(raw.correctAnswer) && raw.correctAnswer.length > 1);
+
+  const isText =
+    /fitb|fib|fill|blank|text|input|typing/.test(t) ||
+    !options ||
+    options.length === 0;
+
+  let kind = "single";
+  if (isText) kind = "text";
+  else if (allowMultiple) kind = "multiple";
+  else kind = "single";
+
+  // section label by index mapping
+  const questionNumber = idx + 1;
+  const sec =
+    sections?.find((s) => questionNumber >= s.start && questionNumber <= s.end)
+      ?.name ?? "General";
+
+  return {
+    ...raw,
+    id,
+    qid: raw.qid ?? id, // keep qid for save API
+    question: qText,
+    options,
+    marks,
+    kind, // "single" | "multiple" | "text"
+    section: sec,
+    __idx: idx,
+  };
+};
+
+/** Parse `sections` string from testpaper into objects */
+const parseSections = (sectionsString, totalQuestions = 0) => {
+  if (!sectionsString)
+    return [{ name: "All Questions", start: 1, end: totalQuestions || 0 }];
+  try {
+    return sectionsString.split("@@@").map((sectionStr) => {
+      const [name, s, e] = sectionStr.split("#@#");
+      return {
+        name: name || "Section",
+        start: parseInt(s, 10) || 1,
+        end: parseInt(e, 10) || totalQuestions || 0,
+      };
+    });
+  } catch {
+    return [{ name: "All Questions", start: 1, end: totalQuestions || 0 }];
+  }
+};
+
+/** Build the payload to send to the backend for the current question */
+const buildResponsePayload = (q, answerValue) => {
+  // We send indices for option questions, text itself for text
+  let response = "";
+  if (q.kind === "single") {
+    // single: answerValue is index (number) or string index
+    if (
+      answerValue !== undefined &&
+      answerValue !== null &&
+      String(answerValue) !== ""
+    ) {
+      response = String(answerValue);
+    }
+  } else if (q.kind === "multiple") {
+    // multiple: answerValue is an array of indices
+    if (Array.isArray(answerValue) && answerValue.length > 0) {
+      response = [
+        ...new Set(answerValue.map((i) => Number(i)).filter(Number.isInteger)),
+      ]
+        .sort((a, b) => a - b)
+        .join(",");
+    }
+  } else if (q.kind === "text") {
+    response = (answerValue ?? "").toString().trim();
+  }
+
+  return {
+    data: q.qid,
+    response,
+  };
+};
+
+/* =============================== Small UI pieces =============================== */
 const MemoizedQuestionNumBox = React.memo(
   ({ current, status, onClick, children }) => (
     <QuestionNumBox $current={current} status={status} onClick={onClick}>
@@ -237,28 +386,26 @@ const MemoizedQuestionNumBox = React.memo(
 );
 
 const QuestionPalette = React.memo(
-  ({ questions, currentQuestionIndex, questionStatus, navigateToQuestion }) => {
-    return (
-      <Box sx={{ overflow: "visible" }}>
-        <Typography variant="subtitle2" fontWeight={800} gutterBottom>
-          Question Palette
-        </Typography>
-        <Grid container spacing={2}>
-          {questions.map((q, index) => (
-            <Grid item xs={2} key={q.id || index}>
-              <MemoizedQuestionNumBox
-                current={currentQuestionIndex === index}
-                status={questionStatus[q.id] || "not-visited"}
-                onClick={() => navigateToQuestion(index)}
-              >
-                {index + 1}
-              </MemoizedQuestionNumBox>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
-    );
-  }
+  ({ questions, currentQuestionIndex, questionStatus, navigateToQuestion }) => (
+    <Box sx={{ overflow: "visible" }}>
+      <Typography variant="subtitle2" fontWeight={800} gutterBottom>
+        Question Palette
+      </Typography>
+      <Grid container spacing={2}>
+        {questions.map((q, index) => (
+          <Grid item xs={2} key={q.id || index}>
+            <MemoizedQuestionNumBox
+              current={currentQuestionIndex === index}
+              status={questionStatus[q.id] || "not-visited"}
+              onClick={() => navigateToQuestion(index)}
+            >
+              {index + 1}
+            </MemoizedQuestionNumBox>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  )
 );
 
 const UserProfile = React.memo(({ authState }) => (
@@ -339,6 +486,7 @@ const QuestionStatusLegend = React.memo(() => (
     ))}
   </Box>
 ));
+
 const SidebarButtons = React.memo(({ navigate, paperId }) => (
   <Box
     sx={{
@@ -353,13 +501,11 @@ const SidebarButtons = React.memo(({ navigate, paperId }) => (
   >
     <Button
       variant="contained"
-      onClick={()=>navigate(`/page2/${paperId}`)}
-      //`/questions/${paperId}`
+      onClick={() => navigate(`/page2/${paperId}`)}
       sx={{
         backgroundColor: "grey.300",
         color: "text.primary",
         "&:hover": { backgroundColor: "grey.400" },
-         
       }}
       fullWidth
     >
@@ -405,9 +551,29 @@ const CompletionScreen = React.memo(({ navigate }) => (
   </Box>
 ));
 
+/* =============================== Question Body (Radio / Checkbox / Text) =============================== */
 const QuestionContent = React.memo(
-  ({ question, index, answers, onAnswerSelect }) => {
+  ({
+    question,
+    index,
+    answers,
+    onSingleSelect,
+    onMultiToggle,
+    onTextChange,
+  }) => {
     if (!question) return null;
+
+    const selectedSingleIndex = Number.isInteger(answers[question.id])
+      ? answers[question.id]
+      : typeof answers[question.id] === "string" && answers[question.id] !== ""
+      ? Number(answers[question.id])
+      : null;
+
+    const selectedMulti = Array.isArray(answers[question.id])
+      ? answers[question.id]
+      : [];
+    const textValue =
+      typeof answers[question.id] === "string" ? answers[question.id] : "";
 
     return (
       <Box key={question.id} sx={{ mb: 5 }}>
@@ -425,7 +591,8 @@ const QuestionContent = React.memo(
         >
           <Box sx={{ display: "flex", alignItems: "baseline", gap: 2 }}>
             <Typography variant="h6" fontWeight={600}>
-              Question #{index + 1}
+              Question #{index + 1}{" "}
+              {question.section ? `• ${question.section}` : ""}
             </Typography>
           </Box>
 
@@ -486,19 +653,19 @@ const QuestionContent = React.memo(
             {question.question}
           </Typography>
 
-          <Box sx={{ mt: 2 }}>
-            {question.options &&
-              question.options.slice(0, 4).map((option, idx) => (
+          {/* SINGLE ANSWER (RADIO) */}
+          {question.kind === "single" && question.options?.length > 0 && (
+            <RadioGroup
+              value={
+                selectedSingleIndex !== null ? String(selectedSingleIndex) : ""
+              }
+              onChange={(e) => onSingleSelect(question, Number(e.target.value))}
+            >
+              {question.options.slice(0, 10).map((option, idx) => (
                 <FormControlLabel
                   key={idx}
-                  control={
-                    <Radio
-                      checked={answers[question.id] === option}
-                      onChange={() => onAnswerSelect(question, idx)}
-                      color="primary"
-                      size="small"
-                    />
-                  }
+                  value={String(idx)}
+                  control={<Radio color="primary" size="small" />}
                   label={option}
                   sx={{
                     display: "flex",
@@ -508,53 +675,103 @@ const QuestionContent = React.memo(
                   }}
                 />
               ))}
-          </Box>
+            </RadioGroup>
+          )}
+
+          {/* MULTIPLE ANSWER (CHECKBOXES) */}
+          {question.kind === "multiple" && question.options?.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              {question.options.slice(0, 10).map((option, idx) => {
+                const checked = selectedMulti.includes(idx);
+                return (
+                  <FormControlLabel
+                    key={idx}
+                    control={
+                      <Checkbox
+                        checked={checked}
+                        onChange={() => onMultiToggle(question, idx)}
+                        color="primary"
+                        size="small"
+                      />
+                    }
+                    label={option}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      mb: 1,
+                      "& .MuiTypography-root": { fontSize: "15px" },
+                    }}
+                  />
+                );
+              })}
+            </Box>
+          )}
+
+          {/* FILL IN THE BLANKS / TEXT INPUT */}
+          {question.kind === "text" && (
+            <Box sx={{ mt: 1, maxWidth: 640 }}>
+              <TextField
+                fullWidth
+                multiline
+                minRows={1}
+                maxRows={6}
+                placeholder="Type your answer here…"
+                value={textValue}
+                onChange={(e) => onTextChange(question, e.target.value)}
+              />
+            </Box>
+          )}
         </Box>
       </Box>
     );
   }
 );
 
+/* =============================== Main Page =============================== */
 const Page3 = () => {
   const { paperId } = useParams();
   const navigate = useNavigate();
   const { authState, setAuthState } = useUser();
 
+  // UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
+
+  // Test state
   const [timeLeft, setTimeLeft] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState({}); // single: number index; multiple: number[]; text: string
   const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [questionStatus, setQuestionStatus] = useState({});
   const [sections, setSections] = useState([]);
   const [currentSectionName, setCurrentSectionName] = useState("");
+
+  // Control state
+  const [loading, setLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [isTestCompleted, setIsTestCompleted] = useState(false);
   const [timerColor, setTimerColor] = useState("inherit");
+  const [error, setError] = useState(null);
+
   const currentQuestion = useMemo(
     () => questions[currentQuestionIndex] || null,
     [questions, currentQuestionIndex]
   );
 
+  /* ----------------------- Axios instance ----------------------- */
   const api = useMemo(() => {
-    const instance = axios.create({
-      baseURL: "/api",
-    });
-
+    const instance = axios.create({ baseURL: "/api", timeout: 15000 });
     instance.interceptors.request.use(
       (config) => {
         if (authState?.accessToken) {
+          // BEARER or raw depends on your backend; your previous save used raw token.
           config.headers.Authorization = authState.accessToken;
         }
         return config;
       },
       (error) => Promise.reject(error)
     );
-
     instance.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -565,93 +782,113 @@ const Page3 = () => {
         return Promise.reject(error);
       }
     );
-
     return instance;
   }, [authState?.accessToken, setAuthState]);
 
-  const stripHTML = useCallback((html) => {
-    if (!html) return "";
-    return html
-      .replace(/<img[^>]*>/gi, "")
-      .replace(/<\/?([^>]+)>/g, "")
-      .trim();
-  }, []);
-   
-  const saveAnswersLocally = useCallback(() => {
+  /* ----------------------- Local persistence ----------------------- */
+  const saveLocal = useCallback((key, data) => {
     try {
-      localStorage.setItem('userAnswers', JSON.stringify(answers));
-      // persist question statuses and questions so result pages can work offline
-      localStorage.setItem('questionStatus', JSON.stringify(questionStatus));
-      localStorage.setItem('questions', JSON.stringify(questions));
-      if (paperId) {
-        localStorage.setItem('currentPaperId', String(paperId));
-      }
-    } catch (err) {
-      console.error('Failed to save locally:', err);
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      console.warn("Local save failed:", e);
     }
-  }, [answers, questionStatus, questions, paperId]);
+  }, []);
 
-  // Auto-save answers/status/questions to localStorage whenever they change
+  const saveAnswersLocally = useCallback(() => {
+    saveLocal("userAnswers", answers);
+    saveLocal("questionStatus", questionStatus);
+    saveLocal("questions", questions);
+    if (paperId) localStorage.setItem("currentPaperId", String(paperId));
+  }, [answers, questionStatus, questions, paperId, saveLocal]);
+
   useEffect(() => {
-    // debounce a little to avoid excessive writes
-    const t = setTimeout(() => saveAnswersLocally(), 300);
+    const t = setTimeout(saveAnswersLocally, 250);
     return () => clearTimeout(t);
   }, [answers, questionStatus, questions, saveAnswersLocally]);
 
-  const parseSections = useCallback((sectionsString) => {
-    if (!sectionsString) return [];
-    try {
-      return sectionsString.split("@@@").map((sectionStr) => {
-        const parts = sectionStr.split("#@#");
-        return {
-          name: parts[0],
-          start: parseInt(parts[1], 10),
-          end: parseInt(parts[2], 10),
-        };
-      });
-    } catch (e) {
-      console.error("Failed to parse sections string:", e);
-      return [];
+  /* ----------------------- Fetch test + questions ----------------------- */
+  const fetchAllData = useCallback(async () => {
+    if (!authState?.accessToken) {
+      setError("Authentication required. Please log in to take the test.");
+      setLoading(false);
+      return;
     }
-  }, []);
+    setLoading(true);
+    setError(null);
 
-  const formatTime = useCallback((seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-      2,
-      "0"
-    )}:${String(secs).padStart(2, "0")}`;
-  }, []);
+    try {
+      const [testPaperRes, questionsRes] = await Promise.all([
+        api.get(`/testpaper/${paperId}`),
+        api.get(`/questions/${paperId}`),
+      ]);
 
-  const timerValue = useMemo(
-    () => formatTime(timeLeft),
-    [timeLeft, formatTime]
-  );
+      const testPaperData = testPaperRes.data || {};
+      const fetchedQuestionsData = Array.isArray(questionsRes.data)
+        ? questionsRes.data
+        : [];
 
+      const parsedSections = parseSections(
+        testPaperData.sections,
+        testPaperData.questions || fetchedQuestionsData.length
+      );
+      setSections(parsedSections);
+
+      if (testPaperData.duration)
+        setTimeLeft(num(testPaperData.duration, 0) * 60);
+
+      const normalized = fetchedQuestionsData.map((q, idx) =>
+        normalizeQuestion(q, idx, parsedSections)
+      );
+      setQuestions(normalized);
+
+      // init status
+      const initialStatus = {};
+      normalized.forEach((q) => {
+        initialStatus[q.id] = "not-visited";
+      });
+      if (normalized.length > 0)
+        initialStatus[normalized[0].id] = "not-answered";
+      setQuestionStatus(initialStatus);
+
+      // restore any cached answers for the same paper
+      const cachedPaperId = localStorage.getItem("currentPaperId");
+      const cachedAns = localStorage.getItem("userAnswers");
+      if (
+        cachedPaperId &&
+        cachedAns &&
+        String(cachedPaperId) === String(paperId)
+      ) {
+        try {
+          const parsed = JSON.parse(cachedAns);
+          if (parsed && typeof parsed === "object") {
+            setAnswers(parsed);
+          }
+        } catch {}
+      }
+    } catch (e) {
+      setError(
+        e?.response?.data?.message || e.message || "Failed to fetch test data."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [api, paperId, authState?.accessToken]);
+
+  /* ----------------------- Save to backend (single question) ----------------------- */
   const saveCurrentAnswer = useCallback(async () => {
-    if (!currentQuestion) return;
-
-    const response =
-      answers[currentQuestion.id] !== undefined
-        ? String(currentQuestion.options.indexOf(answers[currentQuestion.id]))
-        : "";
-
-    const payload = {
-      data: currentQuestion.qid,
-      response: response,
-    };
-
-    console.log("[Save Answer] Saving to backend:", payload);
+    const q = currentQuestion;
+    if (!q) return;
+    const payload = buildResponsePayload(q, answers[q.id]);
     try {
       await api.post(`/testpaper/questions/${paperId}`, payload);
     } catch (err) {
+      console.error("Save failed:", err);
       setError("Failed to save your progress. Please check your connection.");
       throw err;
     }
   }, [api, paperId, currentQuestion, answers]);
 
+  /* ----------------------- Navigation between questions ----------------------- */
   const navigateToQuestion = useCallback(
     async (index) => {
       if (
@@ -666,13 +903,22 @@ const Page3 = () => {
 
         setQuestionStatus((prev) => {
           const newStatus = { ...prev };
-          const currentStatus = prev[currentQuestion.id];
-          if (
-            currentStatus !== "marked" &&
-            currentStatus !== "answered-marked"
-          ) {
-            newStatus[currentQuestion.id] = answers[currentQuestion.id]
-              ? "answered"
+          const curId = currentQuestion?.id;
+          if (curId) {
+            const hasAns =
+              answers[curId] !== undefined &&
+              answers[curId] !== null &&
+              String(answers[curId]) !== "";
+            const isMulti =
+              Array.isArray(answers[curId]) && answers[curId].length > 0;
+            const answered = isMulti || hasAns;
+            const wasMarked =
+              prev[curId] === "marked" || prev[curId] === "answered-marked";
+
+            newStatus[curId] = answered
+              ? wasMarked
+                ? "answered-marked"
+                : "answered"
               : "not-answered";
           }
           return newStatus;
@@ -681,24 +927,24 @@ const Page3 = () => {
         setCurrentQuestionIndex(index);
 
         setQuestionStatus((prev) => {
-          const newQuestionId = questions[index]?.id;
-          if (newQuestionId && prev[newQuestionId] === "not-visited") {
-            const newStatus = { ...prev };
-            newStatus[newQuestionId] = "not-answered";
-            return newStatus;
+          const nextId = questions[index]?.id;
+          if (nextId && prev[nextId] === "not-visited") {
+            const copy = { ...prev };
+            copy[nextId] = "not-answered";
+            return copy;
           }
           return prev;
         });
-      } catch (error) {
-        console.error("Navigation was stopped because save failed:", error);
+      } catch (e) {
+        console.error("Navigation halted because save failed.");
       }
     },
     [
-      saveCurrentAnswer,
+      answers,
       currentQuestion,
       currentQuestionIndex,
       questions,
-      answers,
+      saveCurrentAnswer,
     ]
   );
 
@@ -710,20 +956,26 @@ const Page3 = () => {
         await saveCurrentAnswer();
         setQuestionStatus((prev) => {
           const newStatus = { ...prev };
-          const currentStatus = prev[currentQuestion.id];
-          if (
-            currentStatus !== "marked" &&
-            currentStatus !== "answered-marked"
-          ) {
-            newStatus[currentQuestion.id] = answers[currentQuestion.id]
-              ? "answered"
-              : "not-answered";
+          const curId = currentQuestion?.id;
+          if (curId) {
+            const hasAns =
+              answers[curId] !== undefined &&
+              answers[curId] !== null &&
+              String(answers[curId]) !== "";
+            const isMulti =
+              Array.isArray(answers[curId]) && answers[curId].length > 0;
+            const wasMarked =
+              prev[curId] === "marked" || prev[curId] === "answered-marked";
+            newStatus[curId] =
+              isMulti || hasAns
+                ? wasMarked
+                  ? "answered-marked"
+                  : "answered"
+                : "not-answered";
           }
           return newStatus;
         });
-      } catch (error) {
-        console.error("Failed to save the last question:", error);
-      }
+      } catch {}
     }
   }, [
     navigateToQuestion,
@@ -734,11 +986,9 @@ const Page3 = () => {
     answers,
   ]);
 
-  const handleAnswerSelect = useCallback((question, optionIndex) => {
-    if (!question) return;
-    const selectedOptionText = question.options[optionIndex];
-
-    setAnswers((prev) => ({ ...prev, [question.id]: selectedOptionText }));
+  /* ----------------------- Answer Handlers ----------------------- */
+  const onSingleSelect = useCallback((question, optionIndex) => {
+    setAnswers((prev) => ({ ...prev, [question.id]: Number(optionIndex) }));
     setQuestionStatus((prev) => ({
       ...prev,
       [question.id]:
@@ -749,61 +999,90 @@ const Page3 = () => {
     }));
   }, []);
 
-  const clearResponse = useCallback(async () => {
-    if (!currentQuestion) return;
+  const onMultiToggle = useCallback(
+    (question, optionIndex) => {
+      setAnswers((prev) => {
+        const cur = prev[question.id];
+        const arr = Array.isArray(cur) ? [...cur] : [];
+        const i = arr.indexOf(optionIndex);
+        if (i >= 0) arr.splice(i, 1);
+        else arr.push(optionIndex);
+        return { ...prev, [question.id]: arr };
+      });
 
-    const payload = {
-      data: currentQuestion.qid,
-      response: "",
-    };
+      setQuestionStatus((prev) => {
+        const curStatus = prev[question.id];
+        const isMarked =
+          curStatus === "marked" || curStatus === "answered-marked";
+        const newArr = Array.isArray(answers[question.id])
+          ? [...answers[question.id]]
+          : [];
+        // simulate the toggle result to mark partially answered
+        const willHave = newArr.includes(optionIndex)
+          ? newArr.filter((v) => v !== optionIndex)
+          : [...newArr, optionIndex];
+        let nextStatus = "not-answered";
+        if (willHave.length > 0) nextStatus = "answered";
+        if (isMarked && willHave.length > 0) nextStatus = "answered-marked";
+        return { ...prev, [question.id]: nextStatus };
+      });
+    },
+    [answers]
+  );
+
+  const onTextChange = useCallback((question, value) => {
+    setAnswers((prev) => ({ ...prev, [question.id]: value }));
+    setQuestionStatus((prev) => ({
+      ...prev,
+      [question.id]:
+        prev[question.id] === "marked" ||
+        prev[question.id] === "answered-marked"
+          ? value?.trim()
+            ? "answered-marked"
+            : "marked"
+          : value?.trim()
+          ? "answered"
+          : "not-answered",
+    }));
+  }, []);
+
+  const clearResponse = useCallback(async () => {
+    const q = currentQuestion;
+    if (!q) return;
 
     setAnswers((prev) => {
-      const newAnswers = { ...prev };
-      delete newAnswers[currentQuestion.id];
-      return newAnswers;
+      const clone = { ...prev };
+      delete clone[q.id];
+      return clone;
     });
     setQuestionStatus((prev) => ({
       ...prev,
-      [currentQuestion.id]:
-        prev[currentQuestion.id] === "answered-marked"
-          ? "marked"
-          : "not-answered",
+      [q.id]: prev[q.id] === "answered-marked" ? "marked" : "not-answered",
     }));
 
     try {
-      console.log(`[Clear Response] Clearing in backend:`, payload);
+      const payload = buildResponsePayload(q, "");
       await api.post(`/testpaper/questions/${paperId}`, payload);
     } catch (err) {
       setError("Failed to clear response. Please try again.");
     }
-  }, [currentQuestion, api, paperId]);
+  }, [api, paperId, currentQuestion]);
 
   const markForReview = useCallback(() => {
-    if (!currentQuestion) return;
-    const questionId = currentQuestion.id;
-
-    const response =
-      answers[questionId] !== undefined
-        ? String(currentQuestion.options.indexOf(answers[questionId]))
-        : "";
-    const payload = {
-      data: currentQuestion.qid,
-      response: response,
-    };
-    console.log("[Mark For Review] Saving to backend:", payload);
-
+    const q = currentQuestion;
+    if (!q) return;
+    const payload = buildResponsePayload(q, answers[q.id]);
     api.post(`/testpaper/questions/${paperId}`, payload).catch(() => {
       setError("Failed to save answer (mark for review). Please try again.");
     });
-
     setQuestionStatus((prev) => {
-      const newStatus = { ...prev };
-      newStatus[questionId] = answers[questionId]
-        ? "answered-marked"
-        : "marked";
-      return newStatus;
+      const has = answers[q.id];
+      const answered =
+        (Array.isArray(has) && has.length > 0) ||
+        (has !== undefined && has !== null && String(has) !== "");
+      return { ...prev, [q.id]: answered ? "answered-marked" : "marked" };
     });
-  }, [currentQuestion, answers, api, paperId]);
+  }, [api, paperId, currentQuestion, answers]);
 
   const markAndNext = useCallback(() => {
     markForReview();
@@ -811,171 +1090,90 @@ const Page3 = () => {
       const nextIndex = currentQuestionIndex + 1;
       setCurrentQuestionIndex(nextIndex);
       setQuestionStatus((prev) => {
-        const newQuestionId = questions[nextIndex]?.id;
-        if (newQuestionId && prev[newQuestionId] === "not-visited") {
-          const newStatus = { ...prev };
-          newStatus[newQuestionId] = "not-answered";
-          return newStatus;
+        const nextId = questions[nextIndex]?.id;
+        if (nextId && prev[nextId] === "not-visited") {
+          const copy = { ...prev };
+          copy[nextId] = "not-answered";
+          return copy;
         }
         return prev;
       });
     }
   }, [markForReview, currentQuestionIndex, questions]);
 
+  /* ----------------------- Submit ----------------------- */
   const handleSubmitTest = useCallback(() => setSubmitModalOpen(true), []);
 
-      const confirmSubmit = useCallback(async () => {
-        setSubmitModalOpen(false);
-        setLoading(true);
+  const confirmSubmit = useCallback(async () => {
+    setSubmitModalOpen(false);
+    setLoading(true);
+    try {
+      saveAnswersLocally();
 
-        try {
-            saveAnswersLocally();
+      // Also persist statuses
+      localStorage.setItem("questionStatuses", JSON.stringify(questionStatus));
 
-             localStorage.setItem('questionStatuses', JSON.stringify(questionStatus));
-
-
-            const answeredOptionText = answers[currentQuestion.id];
-            const optionIndex = answeredOptionText !== undefined
-                ? currentQuestion.options.indexOf(answeredOptionText)
-                : -1;
-
-            const payload = {
-                data: currentQuestion.qid,
-                response: optionIndex !== -1 ? String(optionIndex) : ""
-            };
-            
-            console.log("Payload sent to API on final submission:", payload);
-            const submitEndpoint = `/testpaper/questions/${paperId}?isSubmit=1`;
-            await api.post(submitEndpoint, payload);
-
-            console.log("Final submission successful. Navigating to results page.");
-
-            setIsTestCompleted(true);
-            
-            navigate(`/result/${paperId}`);
-        } catch (e) {
-            console.error("Submission failed:", e);
-            setError(`Failed to submit test. Server says: ${e.response?.data?.message || e.message}`);
-        } finally {
-            setLoading(false);
-        }
-  }, [api, paperId, answers, currentQuestion, navigate, setIsTestCompleted, setError, setLoading, saveAnswersLocally, setAuthState]);
-
-// In Page3.jsx
-
-const fetchAllData = useCallback(async () => {
-  if (!authState?.accessToken) {
-    setError("Authentication required. Please log in to take the test.");
-    setLoading(false);
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    const [testPaperRes, questionsRes] = await Promise.all([
-      api.get(`/testpaper/${paperId}`),
-      api.get(`/questions/${paperId}`),
-    ]);
-
-    const testPaperData = testPaperRes.data;
-    const fetchedQuestionsData = questionsRes.data;
-
-    // This part is the same
-    const parsedSections = testPaperData.sections
-        ? parseSections(testPaperData.sections)
-        : [{ name: "All Questions", start: 1, end: testPaperData.questions || 0 }];
-    
-    setSections(parsedSections);
-    
-    if (testPaperData.duration) {
-        setTimeLeft(testPaperData.duration * 60);
-    }
-    
-    if (Array.isArray(fetchedQuestionsData)) {
-        // --- THIS IS THE NEW LOGIC TO ADD SECTION NAMES ---
-        const questionsWithSections = fetchedQuestionsData.map((q, index) => {
-            const questionNumber = index + 1;
-            const section = parsedSections.find(sec => 
-                questionNumber >= sec.start && questionNumber <= sec.end
-            );
-            
-            return {
-                ...q,
-                question: stripHTML(q.question),
-                options: (q.options || [])
-                    .map((opt) => stripHTML(opt))
-                    .filter((opt) => opt && opt.trim() !== ""),
-                // Assign the found section name, or a default
-                section: section ? section.name : 'General' 
-            };
+      // send the last focused question's response (backend requires something similar in your previous code)
+      const q = currentQuestion;
+      if (q) {
+        const payload = buildResponsePayload(q, answers[q.id]);
+        await api.post(`/testpaper/questions/${paperId}?isSubmit=1`, payload);
+      } else {
+        // fallback: still hit submit endpoint
+        await api.post(`/testpaper/questions/${paperId}?isSubmit=1`, {
+          data: "",
+          response: "",
         });
+      }
 
-        setQuestions(questionsWithSections); // Set the updated questions array
-
-        const initialStatus = {};
-        questionsWithSections.forEach((q) => {
-            initialStatus[q.id] = "not-visited";
-        });
-        if (questionsWithSections.length > 0) {
-            initialStatus[questionsWithSections[0].id] = "not-answered";
-        }
-        setQuestionStatus(initialStatus);
+      setIsTestCompleted(true);
+      navigate(`/result/${paperId}`);
+    } catch (e) {
+      console.error("Submission failed:", e);
+      setError(
+        `Failed to submit test. ${e.response?.data?.message || e.message}`
+      );
+    } finally {
+      setLoading(false);
     }
-  } catch (e) {
-    const errorMessage = e.response?.data?.message || e.message || "Failed to fetch test data.";
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-}, [api, paperId, authState?.accessToken, stripHTML, parseSections]);
+  }, [
+    api,
+    paperId,
+    answers,
+    currentQuestion,
+    questionStatus,
+    navigate,
+    saveAnswersLocally,
+  ]);
 
-  const saveTimeoutRef = useRef(null);
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const popupRef = useRef();
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (popupRef.current && !popupRef.current.contains(event.target)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
+  /* ----------------------- Timer ----------------------- */
   useEffect(() => {
     if (!isPaused && timeLeft > 0 && !loading && !isTestCompleted) {
-      const timerInterval = setInterval(() => {
+      const timer = setInterval(() => {
         setTimeLeft((prev) => {
-          const newTime = prev > 0 ? prev - 1 : 0;
-
-          if (newTime <= 600 && timerColor !== "error.main") {
-            setTimerColor("error.main");
-          } else if (
-            newTime <= 1200 &&
-            newTime > 600 &&
-            timerColor !== "warning.main"
-          ) {
-            setTimerColor("warning.main");
-          } else if (newTime > 1200 && timerColor !== "inherit") {
-            setTimerColor("inherit");
-          }
-
-          return newTime;
+          const v = prev > 0 ? prev - 1 : 0;
+          if (v <= 600) setTimerColor("error.main");
+          else if (v <= 1200) setTimerColor("warning.main");
+          else setTimerColor("inherit");
+          return v;
         });
       }, 1000);
-      return () => clearInterval(timerInterval);
+      return () => clearInterval(timer);
     }
-  }, [timeLeft, isPaused, loading, isTestCompleted, timerColor]);
+  }, [timeLeft, isPaused, loading, isTestCompleted]);
 
+  const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(
+      2,
+      "0"
+    )}:${String(s).padStart(2, "0")}`;
+  };
+  const timerValue = useMemo(() => formatTime(timeLeft), [timeLeft]);
+
+  // Auto-submit at time 0
   useEffect(() => {
     if (
       timeLeft === 0 &&
@@ -997,25 +1195,33 @@ const fetchAllData = useCallback(async () => {
     navigate,
   ]);
 
+  // Track section label of current question
   useEffect(() => {
     if (sections.length > 0) {
-      const currentQuestionNumber = currentQuestionIndex + 1;
-      const foundSection = sections.find(
-        (section) =>
-          currentQuestionNumber >= section.start &&
-          currentQuestionNumber <= section.end
-      );
-      if (foundSection) {
-        setCurrentSectionName(foundSection.name);
-      }
+      const n = currentQuestionIndex + 1;
+      const sec = sections.find((s) => n >= s.start && n <= s.end);
+      if (sec) setCurrentSectionName(sec.name);
     }
   }, [currentQuestionIndex, sections]);
 
+  // Initial fetch
   useEffect(() => {
     if (authState?.accessToken && paperId) {
       fetchAllData();
     }
   }, [authState?.accessToken, paperId, fetchAllData]);
+
+  /* ----------------------- Misc UI toggles ----------------------- */
+  const popupRef = useRef();
+  useEffect(() => {
+    const handler = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const handleSectionClick = useCallback(
     (startQuestionNumber) => {
@@ -1024,14 +1230,15 @@ const fetchAllData = useCallback(async () => {
     [navigateToQuestion]
   );
 
-  const toggleSidebar = useCallback(() => setSidebarOpen((prev) => !prev), []);
-  const toggleMenu = useCallback(() => setMenuOpen((prev) => !prev), []);
+  const toggleSidebar = useCallback(() => setSidebarOpen((p) => !p), []);
+  const toggleMenu = useCallback(() => setMenuOpen((p) => !p), []);
 
+  /* ----------------------- Render ----------------------- */
   if (isTestCompleted) {
     return (
       <ErrorBoundary>
         <ThemeProvider theme={theme}>
-          <CompletionScreen paperId={paperId} navigate={navigate} />
+          <CompletionScreen navigate={navigate} />
         </ThemeProvider>
       </ErrorBoundary>
     );
@@ -1053,6 +1260,7 @@ const fetchAllData = useCallback(async () => {
             currentQuestionNumber={currentQuestionIndex + 1}
             onQuestionSelect={(qNum) => navigateToQuestion(qNum - 1)}
             authState={authState}
+            onSidebarToggle={toggleSidebar}
           />
 
           <MainContainer>
@@ -1063,7 +1271,9 @@ const fetchAllData = useCallback(async () => {
                     question={currentQuestion}
                     index={currentQuestionIndex}
                     answers={answers}
-                    onAnswerSelect={handleAnswerSelect}
+                    onSingleSelect={onSingleSelect}
+                    onMultiToggle={onMultiToggle}
+                    onTextChange={onTextChange}
                   />
                 ) : (
                   <Box
@@ -1093,6 +1303,7 @@ const fetchAllData = useCallback(async () => {
               </ScrollableContent>
             </LeftPanel>
 
+            {/* Sidebar */}
             <RightSidebar open={sidebarOpen}>
               <UserProfile authState={authState} />
               <QuestionStatusLegend />
@@ -1104,10 +1315,12 @@ const fetchAllData = useCallback(async () => {
                   navigateToQuestion={navigateToQuestion}
                 />
               </Box>
-              <SidebarButtons navigate={navigate} paperId={paperId}/>
+              <SidebarButtons navigate={navigate} paperId={paperId} />
             </RightSidebar>
+            <SidebarOverlay open={sidebarOpen} onClick={toggleSidebar} />
           </MainContainer>
 
+          {/* Bottom actions */}
           <BottomNav elevation={3}>
             <Box
               sx={{
@@ -1131,7 +1344,15 @@ const fetchAllData = useCallback(async () => {
               <Button
                 variant="outlined"
                 onClick={clearResponse}
-                disabled={!answers[currentQuestion?.id]}
+                disabled={
+                  currentQuestion?.kind === "multiple"
+                    ? !Array.isArray(answers[currentQuestion?.id]) ||
+                      (Array.isArray(answers[currentQuestion?.id]) &&
+                        answers[currentQuestion?.id].length === 0)
+                    : answers[currentQuestion?.id] === undefined ||
+                      answers[currentQuestion?.id] === null ||
+                      String(answers[currentQuestion?.id]) === ""
+                }
                 sx={{
                   display: { xs: "none", md: "flex" },
                   whiteSpace: "nowrap",
@@ -1259,6 +1480,7 @@ const fetchAllData = useCallback(async () => {
             </Box>
           </BottomNav>
 
+          {/* Submit modal */}
           <Modal
             open={submitModalOpen}
             onClose={() => setSubmitModalOpen(false)}
