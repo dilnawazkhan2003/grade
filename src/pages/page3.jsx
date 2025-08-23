@@ -42,9 +42,7 @@ import {
 import { styled } from "@mui/material/styles";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 
-
 const API_BASE_URL = "https://test.iblib.com";
-
 
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
@@ -69,7 +67,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-/* =============================== Theme =============================== */
 const theme = createTheme({
   palette: {
     primary: { main: "#2196F3" },
@@ -84,7 +81,6 @@ const theme = createTheme({
   },
 });
 
-/* =============================== Styled =============================== */
 const StyledContainer = styled(Box)(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
@@ -242,7 +238,6 @@ const QuestionNumBox = styled(Box, {
   }),
 }));
 
-/* =============================== Helpers =============================== */
 const num = (v, d = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
@@ -256,18 +251,12 @@ const stripHTML = (html) => {
     .trim();
 };
 
-// ==========================================================
-// 2. MODIFIED: The normalizeQuestion function is updated.
-// ==========================================================
-/** Normalize question coming from API to a stable shape our UI can rely on */
 const normalizeQuestion = (raw, idx, sections) => {
   const id =
     raw.id ?? raw.qid ?? raw._id ?? raw.questionId ?? raw.uuid ?? String(idx);
 
-  // Get the raw HTML from the question to preserve image tags
   let qHTML = raw.question ?? raw.q ?? raw.text ?? "";
 
-  // Process the HTML to construct full image URLs
   if (qHTML && qHTML.includes("<img")) {
     try {
       const parser = new DOMParser();
@@ -275,9 +264,7 @@ const normalizeQuestion = (raw, idx, sections) => {
       const images = doc.querySelectorAll("img");
       images.forEach((img) => {
         const src = img.getAttribute("src");
-        // Check if the src is a relative path
         if (src && !/^(https?:|data:)/.test(src)) {
-          // Construct the full URL and update the src attribute
           const newSrc = new URL(src, API_BASE_URL).href;
           img.setAttribute("src", newSrc);
         }
@@ -288,7 +275,6 @@ const normalizeQuestion = (raw, idx, sections) => {
     }
   }
 
-  // Options are still stripped of HTML for simplicity
   const rawOptions = raw.options ?? raw.choices ?? raw.opts ?? [];
   const options = Array.isArray(rawOptions)
     ? rawOptions
@@ -300,7 +286,6 @@ const normalizeQuestion = (raw, idx, sections) => {
         .filter(Boolean)
     : [];
 
-  // marks (positive/negative)
   const m = raw.marks ?? {};
   const marks = {
     positive: num(
@@ -317,7 +302,6 @@ const normalizeQuestion = (raw, idx, sections) => {
     ),
   };
 
-  // figure out question kind
   const t = String(
     raw.type ?? raw.questionType ?? raw.answerType ?? ""
   ).toLowerCase();
@@ -337,7 +321,6 @@ const normalizeQuestion = (raw, idx, sections) => {
   else if (allowMultiple) kind = "multiple";
   else kind = "single";
 
-  // section label by index mapping
   const questionNumber = idx + 1;
   const sec =
     sections?.find((s) => questionNumber >= s.start && questionNumber <= s.end)
@@ -346,17 +329,16 @@ const normalizeQuestion = (raw, idx, sections) => {
   return {
     ...raw,
     id,
-    qid: raw.qid ?? id, // keep qid for save API
-    question: qHTML, // Use the processed HTML
+    qid: raw.qid ?? id,
+    question: qHTML,
     options,
     marks,
-    kind, // "single" | "multiple" | "text"
+    kind,
     section: sec,
     __idx: idx,
   };
 };
 
-/** Parse `sections` string from testpaper into objects */
 const parseSections = (sectionsString, totalQuestions = 0) => {
   if (!sectionsString)
     return [{ name: "All Questions", start: 1, end: totalQuestions || 0 }];
@@ -374,12 +356,9 @@ const parseSections = (sectionsString, totalQuestions = 0) => {
   }
 };
 
-/** Build the payload to send to the backend for the current question */
 const buildResponsePayload = (q, answerValue) => {
-  // We send indices for option questions, text itself for text
   let response = "";
   if (q.kind === "single") {
-    // single: answerValue is index (number) or string index
     if (
       answerValue !== undefined &&
       answerValue !== null &&
@@ -388,7 +367,6 @@ const buildResponsePayload = (q, answerValue) => {
       response = String(answerValue);
     }
   } else if (q.kind === "multiple") {
-    // multiple: answerValue is an array of indices
     if (Array.isArray(answerValue) && answerValue.length > 0) {
       response = [
         ...new Set(answerValue.map((i) => Number(i)).filter(Number.isInteger)),
@@ -406,7 +384,6 @@ const buildResponsePayload = (q, answerValue) => {
   };
 };
 
-/* =============================== Small UI pieces =============================== */
 const MemoizedQuestionNumBox = React.memo(
   ({ current, status, onClick, children }) => (
     <QuestionNumBox $current={current} status={status} onClick={onClick}>
@@ -581,7 +558,6 @@ const CompletionScreen = React.memo(({ navigate }) => (
   </Box>
 ));
 
-/* =============================== Question Body (Radio / Checkbox / Text) =============================== */
 const QuestionContent = React.memo(
   ({
     question,
@@ -679,9 +655,6 @@ const QuestionContent = React.memo(
         </Box>
 
         <Box>
-          {/* ========================================================== */}
-          {/* 3. MODIFIED: This renders the question as HTML */}
-          {/* ========================================================== */}
           <Box
             component="div"
             sx={{
@@ -700,7 +673,6 @@ const QuestionContent = React.memo(
             dangerouslySetInnerHTML={{ __html: question.question || "" }}
           />
 
-          {/* SINGLE ANSWER (RADIO) */}
           {question.kind === "single" && question.options?.length > 0 && (
             <RadioGroup
               value={
@@ -725,7 +697,6 @@ const QuestionContent = React.memo(
             </RadioGroup>
           )}
 
-          {/* MULTIPLE ANSWER (CHECKBOXES) */}
           {question.kind === "multiple" && question.options?.length > 0 && (
             <Box sx={{ mt: 1 }}>
               {question.options.slice(0, 10).map((option, idx) => {
@@ -754,7 +725,6 @@ const QuestionContent = React.memo(
             </Box>
           )}
 
-          {/* FILL IN THE BLANKS / TEXT INPUT */}
           {question.kind === "text" && (
             <Box sx={{ mt: 1, maxWidth: 640 }}>
               <TextField
@@ -774,27 +744,23 @@ const QuestionContent = React.memo(
   }
 );
 
-/* =============================== Main Page =============================== */
 const Page3 = () => {
   const { paperId } = useParams();
   const navigate = useNavigate();
   const { authState, setAuthState } = useUser();
 
-  // UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
 
-  // Test state
   const [timeLeft, setTimeLeft] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState({}); // single: number index; multiple: number[]; text: string
+  const [answers, setAnswers] = useState({});
   const [questions, setQuestions] = useState([]);
   const [questionStatus, setQuestionStatus] = useState({});
   const [sections, setSections] = useState([]);
   const [currentSectionName, setCurrentSectionName] = useState("");
 
-  // Control state
   const [loading, setLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [isTestCompleted, setIsTestCompleted] = useState(false);
@@ -806,13 +772,11 @@ const Page3 = () => {
     [questions, currentQuestionIndex]
   );
 
-  /* ----------------------- Axios instance ----------------------- */
   const api = useMemo(() => {
     const instance = axios.create({ baseURL: "/api", timeout: 15000 });
     instance.interceptors.request.use(
       (config) => {
         if (authState?.accessToken) {
-          // BEARER or raw depends on your backend; your previous save used raw token.
           config.headers.Authorization = authState.accessToken;
         }
         return config;
@@ -832,7 +796,6 @@ const Page3 = () => {
     return instance;
   }, [authState?.accessToken, setAuthState]);
 
-  /* ----------------------- Local persistence ----------------------- */
   const saveLocal = useCallback((key, data) => {
     try {
       localStorage.setItem(key, JSON.stringify(data));
@@ -853,7 +816,6 @@ const Page3 = () => {
     return () => clearTimeout(t);
   }, [answers, questionStatus, questions, saveAnswersLocally]);
 
-  /* ----------------------- Fetch test + questions ----------------------- */
   const fetchAllData = useCallback(async () => {
     if (!authState?.accessToken) {
       setError("Authentication required. Please log in to take the test.");
@@ -888,7 +850,6 @@ const Page3 = () => {
       );
       setQuestions(normalized);
 
-      // init status
       const initialStatus = {};
       normalized.forEach((q) => {
         initialStatus[q.id] = "not-visited";
@@ -897,7 +858,6 @@ const Page3 = () => {
         initialStatus[normalized[0].id] = "not-answered";
       setQuestionStatus(initialStatus);
 
-      // restore any cached answers for the same paper
       const cachedPaperId = localStorage.getItem("currentPaperId");
       const cachedAns = localStorage.getItem("userAnswers");
       if (
@@ -921,7 +881,6 @@ const Page3 = () => {
     }
   }, [api, paperId, authState?.accessToken]);
 
-  /* ----------------------- Save to backend (single question) ----------------------- */
   const saveCurrentAnswer = useCallback(async () => {
     const q = currentQuestion;
     if (!q) return;
@@ -935,7 +894,6 @@ const Page3 = () => {
     }
   }, [api, paperId, currentQuestion, answers]);
 
-  /* ----------------------- Navigation between questions ----------------------- */
   const navigateToQuestion = useCallback(
     async (index) => {
       if (
@@ -1033,7 +991,6 @@ const Page3 = () => {
     answers,
   ]);
 
-  /* ----------------------- Answer Handlers ----------------------- */
   const onSingleSelect = useCallback((question, optionIndex) => {
     setAnswers((prev) => ({ ...prev, [question.id]: Number(optionIndex) }));
     setQuestionStatus((prev) => ({
@@ -1064,7 +1021,6 @@ const Page3 = () => {
         const newArr = Array.isArray(answers[question.id])
           ? [...answers[question.id]]
           : [];
-        // simulate the toggle result to mark partially answered
         const willHave = newArr.includes(optionIndex)
           ? newArr.filter((v) => v !== optionIndex)
           : [...newArr, optionIndex];
@@ -1148,7 +1104,6 @@ const Page3 = () => {
     }
   }, [markForReview, currentQuestionIndex, questions]);
 
-  /* ----------------------- Submit ----------------------- */
   const handleSubmitTest = useCallback(() => setSubmitModalOpen(true), []);
 
   const confirmSubmit = useCallback(async () => {
@@ -1157,16 +1112,13 @@ const Page3 = () => {
     try {
       saveAnswersLocally();
 
-      // Also persist statuses
       localStorage.setItem("questionStatuses", JSON.stringify(questionStatus));
 
-      // send the last focused question's response (backend requires something similar in your previous code)
       const q = currentQuestion;
       if (q) {
         const payload = buildResponsePayload(q, answers[q.id]);
         await api.post(`/testpaper/questions/${paperId}?isSubmit=1`, payload);
       } else {
-        // fallback: still hit submit endpoint
         await api.post(`/testpaper/questions/${paperId}?isSubmit=1`, {
           data: "",
           response: "",
@@ -1193,7 +1145,6 @@ const Page3 = () => {
     saveAnswersLocally,
   ]);
 
-  /* ----------------------- Timer ----------------------- */
   useEffect(() => {
     if (!isPaused && timeLeft > 0 && !loading && !isTestCompleted) {
       const timer = setInterval(() => {
@@ -1220,7 +1171,6 @@ const Page3 = () => {
   };
   const timerValue = useMemo(() => formatTime(timeLeft), [timeLeft]);
 
-  // Auto-submit at time 0
   useEffect(() => {
     if (
       timeLeft === 0 &&
@@ -1242,7 +1192,6 @@ const Page3 = () => {
     navigate,
   ]);
 
-  // Track section label of current question
   useEffect(() => {
     if (sections.length > 0) {
       const n = currentQuestionIndex + 1;
@@ -1251,14 +1200,12 @@ const Page3 = () => {
     }
   }, [currentQuestionIndex, sections]);
 
-  // Initial fetch
   useEffect(() => {
     if (authState?.accessToken && paperId) {
       fetchAllData();
     }
   }, [authState?.accessToken, paperId, fetchAllData]);
 
-  /* ----------------------- Misc UI toggles ----------------------- */
   const popupRef = useRef();
   useEffect(() => {
     const handler = (e) => {
@@ -1280,7 +1227,6 @@ const Page3 = () => {
   const toggleSidebar = useCallback(() => setSidebarOpen((p) => !p), []);
   const toggleMenu = useCallback(() => setMenuOpen((p) => !p), []);
 
-  /* ----------------------- Render ----------------------- */
   if (isTestCompleted) {
     return (
       <ErrorBoundary>
@@ -1350,7 +1296,6 @@ const Page3 = () => {
               </ScrollableContent>
             </LeftPanel>
 
-            {/* Sidebar */}
             <RightSidebar open={sidebarOpen}>
               <UserProfile authState={authState} />
               <QuestionStatusLegend />
@@ -1367,7 +1312,6 @@ const Page3 = () => {
             <SidebarOverlay open={sidebarOpen} onClick={toggleSidebar} />
           </MainContainer>
 
-          {/* Bottom actions */}
           <BottomNav elevation={3}>
             <Box
               sx={{
@@ -1527,7 +1471,6 @@ const Page3 = () => {
             </Box>
           </BottomNav>
 
-          {/* Submit modal */}
           <Modal
             open={submitModalOpen}
             onClose={() => setSubmitModalOpen(false)}
