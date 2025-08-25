@@ -104,7 +104,7 @@ import React, {
   }));
 
   const LeftPanel = styled(Box)(({ theme }) => ({
-    width: "1111px",
+    width: "1110px",
     flexShrink: 0,
     backgroundColor: theme.palette.background.paper,
     borderRight: `1px solid ${theme.palette.divider}`,
@@ -1145,10 +1145,10 @@ import React, {
         const q = currentQuestion;
         if (q) {
           const payload = buildResponsePayload(q, answers[q.id]);
-          await api.post(`/testpaper/questions/${paperId}?isSubmit=1`, payload);
+          await api.post(`/testpaper/questions/${paperId}?isSubmit=0`, payload);
         } else {
         
-          await api.post(`/testpaper/questions/${paperId}?isSubmit=1`, {
+          await api.post(`/testpaper/questions/${paperId}?isSubmit=0`, {
             data: "",
             response: "",
           });
