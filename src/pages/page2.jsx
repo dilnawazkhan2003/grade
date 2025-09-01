@@ -6,7 +6,7 @@ import {
   Select, Button, FormControlLabel, Checkbox, useTheme,
   CssBaseline, ThemeProvider, CircularProgress, Alert
 } from "@mui/material";
-import Header from '../component/header'
+import Header from "../component/header";
 import { useUser } from "../context/UserContext";
 
 const Scroll = styled(Box)(({ theme }) => ({
@@ -55,7 +55,7 @@ const generateInstructions = (details) => {
   dynamicInstructions.push(`Marks for correct answers and penalties for wrong answers (if any) are indicated for each question.`);
   
   
-  dynamicInstructions.push("The clock has been set at the server. The countdown timer at the top of the screen will display the remaining time. The test will submit automatically when the time reaches zero.");
+  dynamicInstructions.push("The countdown timer at the top of the screen will display the remaining time. The test will submit automatically when the time reaches zero.");
 
  
   dynamicInstructions.push("To navigate to a question, click on its number in the Question Palette. To save your answer, you must click the 'Save & Next' button.");
@@ -97,10 +97,15 @@ const Page2 = () => {
   const [sourceInstructions, setSourceInstructions] = useState(null);
   const [displayText, setDisplayText] = useState(null);
   const [language, setLanguage] = useState("english");
-  const [isChecked, setIsChecked] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [isChecked, setIsChecked] = useState(() => {
+  const savedAnswers = localStorage.getItem('userAnswers');
+  const savedPaperId = localStorage.getItem('currentPaperId');
+  return !!(savedAnswers && savedPaperId === paperId);
+  });  const [isTranslating, setIsTranslating] = useState(false);
 
   
+  // In page2.jsx
+
   useEffect(() => {
     const fetchTestDetails = async () => {
       setLoading(true);
@@ -115,8 +120,20 @@ const Page2 = () => {
         setTestDetails(details);
 
         const generated = generateInstructions(details);
+
+        // --- FIX IS HERE ---
+        // Check if a test is already in progress
+        const savedAnswers = localStorage.getItem('userAnswers');
+        const savedPaperId = localStorage.getItem('currentPaperId');
+        
+        // If answers exist for THIS specific paper, change the button text
+        if (savedAnswers && savedPaperId === paperId) {
+            generated.readyButton = "Resume Test";
+        }
+        
         setSourceInstructions(generated);
         setDisplayText(generated);
+
       } catch (e) {
         setError(e.response?.data?.message || "Failed to load test instructions.");
       } finally {
@@ -289,8 +306,8 @@ const Page2 = () => {
             </Box>
 
 
-            <Box sx={{ mt: 4, flexGrow: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2, color: "text.primary" }}>
+            <Box sx={{ mt: 5, flexGrow: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: "bold", mb: 3,mt:2, color: "text.primary" }}>
                 {displayText.declaration}
               </Typography>
               <FormControlLabel

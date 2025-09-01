@@ -1,336 +1,413 @@
+// page 4
+
+
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
+import { useUser } from "../context/UserContext";
+import Header2 from "../component/Header2";
 import {
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Button,
   Box,
-  AppBar,
-  Toolbar,
-  useMediaQuery,
-  useTheme,
-  CssBaseline
-} from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
+  Typography,
+  Button,
+  Grid,
+  Paper,
+  CircularProgress,
+  Alert,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
+} from "@mui/material";
+import { Replay, Analytics, ArrowBack } from "@mui/icons-material";
+import { styled } from "@mui/material/styles";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 
 const theme = createTheme({
-  typography: {
-    fontFamily: 'Roboto, sans-serif',
-    h3: {  
-      fontSize: '1.5rem',
-      fontWeight: 600,
-      '@media (max-width:768px)': {  
-        fontSize: '1.3rem',
-      },
-      '@media (max-width:480px)': {  
-        fontSize: '1.2rem',
-      },
-    },
-    h4: {  
-      fontSize: '1.3rem',
-      fontWeight: 600,
-      '@media (max-width:480px)': {  
-        fontSize: '1.2rem',
-      },
-    },
-    h5: {  
-      fontSize: '1.2rem',
-      fontWeight: 600,
-    },
-    h6: { 
-      fontSize: '1.2rem',
-      fontWeight: 500,
-      '@media (max-width:480px)': {
-        fontSize: '1rem',
-      },
-    },
-    body1: {  
-      fontSize: '1rem',
-    },
-    body2: { 
-      fontSize: '0.95rem',
-      '@media (max-width:768px)': {
-        fontSize: '0.9rem',
-      },
-    },
-  },
   palette: {
-    primary: { main: '#0077B6' },
-    success: { main: '#28a745' },
-    error: { main: '#dc3545' },
-    warning: { main: '#fd7e14' },  
-    info: { main: '#6f42c1' },  
-    secondary: { main: '#2196f3' },  
-    text: {
-      primary: '#333333',
-      secondary: '#2196f3',
-      disabled: '#ffffff',  
-    },
-    background: {
-      default: '#f0f2f5',
-      paper: '#ffffff',
-    },
-    divider: '#dddddd',
+    primary: { main: "#2196F3" },
+    secondary: { main: "#007bff" },
+    error: { main: "#f44336" },
+    success: { main: "#4CAF50" },
+    warning: { main: "#FF9800" },
+    info: { main: "#9c27b0" },
   },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        body: {
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          fontFamily: 'Roboto, sans-serif',
-          color: '#333333',
-          backgroundColor: '#f0f2f5',
-        }
-      }
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
-          backgroundColor: '#ffffff',
-          padding: '30px',
-          '@media (max-width:768px)': { padding: '20px' },
-          '@media (max-width:480px)': { padding: '15px' },
-        },
-      },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          boxShadow: 'none',
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid #dddddd',
-          padding: '15px 20px',
-          '@media (max-width:480px)': {
-            flexDirection: 'column',
-            gap: '10px',
-            padding: '12px 15px',
-          },
-        },
-      },
-    },
-    MuiToolbar: {
-      styleOverrides: {
-        root: {
-          paddingLeft: '0px',  
-          paddingRight: '0px',  
-          minHeight: 'auto',  
-          '@media (min-width:600px)': {  
-            paddingLeft: '0px',
-            paddingRight: '0px',
-          },
-        },
-      },
-    },
-    MuiTableContainer: {
-      styleOverrides: {
-        root: {
-          marginBottom: '30px',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch', // Fixed the kebab-case warning
-        }
-      }
-    },
-    MuiTableHead: {
-      styleOverrides: {
-        root: {
-          backgroundColor: '#e0f2f7',
-        },
-      },
-    },
-    MuiTableCell: {
-      styleOverrides: {
-        head: {
-          backgroundColor: '#e0f2f7',
-          fontWeight: 600,
-          color: '#0077B6',
-          padding: '14px 16px',
-          textAlign: 'center',
-          border: '1px solid #dddddd',
-          whiteSpace: 'nowrap',
-          fontSize: '0.95rem',  
-          '@media (max-width:768px)': {
-            padding: '10px 12px',
-            fontSize: '0.9rem',
-          },
-        },
-        body: {
-          padding: '12px 16px',
-          textAlign: 'center',
-          border: '1px solid #dddddd',
-          fontSize: '0.95rem',
-          '@media (max-width:768px)': {
-            padding: '10px 12px',
-            fontSize: '0.9rem',
-          },
-        },
-      },
-    },
-  },
+  typography: { fontFamily: "Roboto, sans-serif" },
 });
 
-const Page4 = () => {  
-  const tableData = [
-    { section: 'General Intelligence and Reasoning', questions: 25, answered: 0, notAnswered: 8, markedForReview: 7, notVisited: 17 },
-    { section: 'General Awareness', questions: 25, answered: 0, notAnswered: 9, markedForReview: 1, notVisited: 16 },
-    { section: 'Quantitative Aptitude', questions: 25, answered: 0, notAnswered: 1, markedForReview: 0, notVisited: 24 },
-    { section: 'English Comprehension', questions: 25, answered: 0, notAnswered: 1, markedForReview: 0, notVisited: 24 },
-  ];
+class ErrorBoundary extends React.Component {
+  state = { hasError: false, error: null };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box sx={{ p: 4, textAlign: "center" }}>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Something went wrong. Please refresh the page.
+          </Alert>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-  const currentTheme = useTheme();
-  const isTablet = useMediaQuery(currentTheme.breakpoints.down('md')); 
-  const isMobile = useMediaQuery(currentTheme.breakpoints.down('sm'));  
+const StyledContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  minHeight: "100vh",
+  backgroundColor: theme.palette.grey[100],
+}));
+
+const MainContent = styled(Box)(({ theme }) => ({
+  flexGrow: 1,
+  padding: theme.spacing(3),
+  maxWidth: "1200px",
+  margin: "0 auto",
+  width: "100%",
+}));
+
+
+const SummaryCard = ({ summary }) => (
+  <Card sx={{ mb: 3 }}>
+    <CardContent>
+      <Typography variant="h4" gutterBottom align="center">
+        Test Summary
+      </Typography>
+      <Grid container spacing={2} textAlign="center">
+        <Grid item xs={6} sm={3}>
+          <Typography variant="h5" color="primary">
+            {summary.totalScore || 0} / {summary.maxMarks || 0}
+          </Typography>
+          <Typography variant="caption">Total Score</Typography>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Typography variant="h5" color="success.main">
+            {summary.totalCorrect || 0}
+          </Typography>
+          <Typography variant="caption">Correct</Typography>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Typography variant="h5" color="error.main">
+            {summary.totalIncorrect || 0}
+          </Typography>
+          <Typography variant="caption">Incorrect</Typography>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Typography variant="h5" color="text.secondary">
+            {summary.totalUnattempted || 0}
+          </Typography>
+          <Typography variant="caption">Unattempted</Typography>
+        </Grid>
+      </Grid>
+    </CardContent>
+  </Card>
+);
+
+const SectionCard = ({ section }) => (
+    <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        {section.name}
+      </Typography>
+      <Grid container spacing={2}>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle1">
+            Score:{" "}
+            <Typography component="span" fontWeight="bold" color="primary">
+              {section.score} / {section.maxMarks}
+            </Typography>
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle1">
+            Correct:{" "}
+            <Typography component="span" fontWeight="bold" color="success.main">
+              {section.correct}
+            </Typography>
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle1">
+            Incorrect:{" "}
+            <Typography component="span" fontWeight="bold" color="error.main">
+              {section.incorrect}
+            </Typography>
+          </Typography>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Typography variant="subtitle1">
+            Unattempted:{" "}
+            <Typography component="span" fontWeight="bold">
+              {section.unattempted}
+            </Typography>
+          </Typography>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+
+const QuestionReviewCard = ({ item, questionNumber }) => (
+    <Paper sx={{ p: 2, mb: 2 }}>
+      <Typography variant="body1" fontWeight="bold" gutterBottom>
+        Q{questionNumber}: <span dangerouslySetInnerHTML={{ __html: item.question }} />
+      </Typography>
+      <Divider sx={{ my: 1 }} />
+      <Box>
+        <Chip
+          label={`Your Answer: ${item.selectedAnswers || "Not Answered"}`}
+          color={item.givenMarks > 0 ? "success" : "error"}
+          variant="outlined"
+          sx={{ mr: 1, mb: 1 }}
+        />
+        <Chip
+          label={`Correct Answer: ${item.answers[0]}`}
+          color="success"
+          sx={{ mb: 1 }}
+        />
+      </Box>
+      {item.explanation && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 1, p: 1, bgcolor: "grey.100", borderRadius: 1 }}
+        >
+          <strong>Explanation:</strong> <span dangerouslySetInnerHTML={{ __html: item.explanation }} />
+        </Typography>
+      )}
+    </Paper>
+  );
+
+ 
+
+const Page4 = () => {
+  const { paperId } = useParams();
+  const navigate = useNavigate();
+  const { authState, setAuthState } = useUser();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [detailedResults, setDetailedResults] = useState([]);
+  const [viewMode, setViewMode] = useState("summary");  
+
+  const hasViewedAnswers = useMemo(() => {
+    return localStorage.getItem(`answers_viewed_${paperId}`) === "true";
+  }, [paperId]);
+
+  const api = useMemo(() => {
+    const instance = axios.create({ baseURL: "/api", timeout: 15000 });
+    instance.interceptors.request.use(
+      (config) => {
+        if (authState?.accessToken) {
+          config.headers.Authorization = authState.accessToken;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+    instance.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          setAuthState(null);
+        }
+        return Promise.reject(error);
+      }
+    );
+    return instance;
+  }, [authState?.accessToken, setAuthState]);
+
+  const processResults = (questions) => {
+    let totalScore = 0;
+    let maxMarks = 0;
+    let totalCorrect = 0;
+    let totalIncorrect = 0;
+    let totalUnattempted = 0;
+    
+    const sectionsData = {};
+
+    questions.forEach((q, index) => {
+      const sectionName = q.section || "General";
+      if (!sectionsData[sectionName]) {
+        sectionsData[sectionName] = {
+            name: sectionName,
+            score: 0,
+            maxMarks: 0,
+            correct: 0,
+            incorrect: 0,
+            unattempted: 0,
+        };
+      }
+
+      maxMarks += q.marks;
+      sectionsData[sectionName].maxMarks += q.marks;
+      
+      if (q.selectedAnswers === null || q.selectedAnswers === "") {
+        totalUnattempted++;
+        sectionsData[sectionName].unattempted++;
+      } else if (q.givenMarks > 0) {
+        totalCorrect++;
+        sectionsData[sectionName].correct++;
+        totalScore += q.givenMarks;
+        sectionsData[sectionName].score += q.givenMarks;
+      } else {
+        totalIncorrect++;
+        sectionsData[sectionName].incorrect++;
+        totalScore -= q.negativeMarks;
+        sectionsData[sectionName].score -= q.negativeMarks;
+      }
+    });
+
+    return {
+        totalScore,
+        maxMarks,
+        totalCorrect,
+        totalIncorrect,
+        totalUnattempted,
+        sections: Object.values(sectionsData),
+    };
+  };
+
+  const fetchDetailedResults = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+   
+      const { data } = await api.get(`/questions/${paperId}`);
+      
+      const processedSummary = processResults(data);
+      setSummary(processedSummary);
+      setDetailedResults(data);
+      setViewMode("detailed");
+
+    } catch (e) {
+      setError(
+        e?.response?.data?.message ||
+          e.message ||
+          "Failed to fetch detailed results."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [api, paperId]);
+
+
+  useEffect(() => {
+    if (hasViewedAnswers) {
+      fetchDetailedResults();
+    }
+     
+  }, [hasViewedAnswers, fetchDetailedResults]);
+
+  const handleViewDetailedAnswers = () => {
+    localStorage.setItem(`answers_viewed_${paperId}`, "true");
+    fetchDetailedResults();
+  };
+
+  const handleRetry = () => {
+    navigate(`/page3/${paperId}`);
+  };
+
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        minHeight: '100vh', 
-        width: '100%',
-        paddingTop: '60px' // Added padding to account for header
-      }}>
-        <Box sx={{
-          flex: 1,  
-          padding: { xs: '15px', sm: '25px 20px' },
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',  
-          overflowY: 'auto',
-        }}>
-          <Paper sx={{ 
-            width: '100%', 
-            maxWidth: '900px',
-            marginTop: { xs: '20px', sm: '40px' } // Adjusted margin for mobile
-          }}>
-            <Typography 
-              variant={isMobile ? "h5" : isTablet ? "h4" : "h3"} 
-              component="h2" 
-              sx={{ 
-                marginBottom: { xs: '20px', sm: '25px' }, 
-                textAlign: 'center' 
-              }}
-            >
-              Summary
-            </Typography>
+    <ErrorBoundary>
+      <ThemeProvider theme={theme}>
+        <StyledContainer>
+          <Header2
+            authState={authState}
+            title="Test Results"
+          />
+          <MainContent>
+            {viewMode === "summary" && (
+              <Paper sx={{ p: 3, textAlign: "center" }}>
+                <Typography variant="h4" gutterBottom>
+                  Test Submitted!
+                </Typography>
+                <Typography variant="h6" gutterBottom>
+                  What would you like to do next?
+                </Typography>
+                <Box sx={{ display: "flex", gap: 2, justifyContent: "center", mt: 3 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Replay />}
+                    onClick={handleRetry}
+                    size="large"
+                  >
+                    Retry Test
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Analytics />}
+                    onClick={handleViewDetailedAnswers}
+                    size="large"
+                  >
+                    View Final Result
+                  </Button>
+                </Box>
+              </Paper>
+            )}
 
-            <TableContainer>
-              <Table sx={{ 
-                minWidth: 600, 
-                borderCollapse: 'collapse',
-                '@media (max-width:600px)': {
-                  minWidth: '100%'
-                }
-              }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ 
-                      textAlign: 'left', 
-                      minWidth: { xs: '150px', sm: 'auto' } 
-                    }}>
-                      Section
-                    </TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: '80px', sm: 'auto' } }}>
-                      No. of questions
-                    </TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: '70px', sm: 'auto' } }}>
-                      Answered
-                    </TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: '90px', sm: 'auto' } }}>
-                      Not Answered
-                    </TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: '110px', sm: 'auto' } }}>
-                      Marked for Review
-                    </TableCell>
-                    <TableCell align="center" sx={{ minWidth: { xs: '90px', sm: 'auto' } }}>
-                      Not Visited
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
+            {viewMode === "detailed" && summary && (
+              <>
+                <SummaryCard summary={summary} />
 
-                <TableBody>
-                  {tableData.map((row, index) => (
-                    <TableRow 
-                      key={row.section} 
-                      sx={{ 
-                        backgroundColor: index % 2 === 0 ? 'inherit' : '#f9f9f9',
-                        '&:last-child td': {
-                          borderBottom: 'none'
-                        }
-                      }}
-                    >
-                      <TableCell sx={{ 
-                        textAlign: 'left', 
-                        fontWeight: 500, 
-                        color: 'text.primary',
-                        wordBreak: 'break-word'
-                      }}>
-                        {row.section}
-                      </TableCell>
-                      <TableCell align="center">{row.questions}</TableCell>
-                      <TableCell align="center" sx={{ color: 'success.main', fontWeight: 700 }}>
-                        {row.answered}
-                      </TableCell>
-                      <TableCell align="center" sx={{ color: 'error.main', fontWeight: 700 }}>
-                        {row.notAnswered}
-                      </TableCell>
-                      <TableCell align="center" sx={{ color: 'info.main', fontWeight: 700 }}>
-                        {row.markedForReview}
-                      </TableCell>
-                      <TableCell align="center" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                        {row.notVisited}
-                      </TableCell>
-                    </TableRow>
+                <Box sx={{ mt: 4 }}>
+                   <Typography variant="h5" gutterBottom>
+                    Section-wise Performance
+                  </Typography>
+                  {summary.sections.map((section, index) => (
+                    <SectionCard key={index} section={section} />
                   ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </Box>
 
-            <Box sx={{ 
-              display: 'flex',
-              justifyContent: 'center',
-              gap: { xs: '10px', sm: '15px', md: '20px' },
-              marginTop: '30px',
-              flexWrap: 'wrap',
-              paddingBottom: '10px'
-            }}>
-              <Button 
-                variant="contained" 
-                color="secondary"
-                sx={{
-                  minWidth: { xs: '120px', sm: '150px' }
-                }}
-              >
-                Tests
-              </Button>
-              <Button 
-                variant="contained" 
-                sx={{
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  minWidth: { xs: '120px', sm: '150px' },
-                  '&:hover': {
-                    backgroundColor: '#d32f2f'
-                  }
-                }}
-              >
-                Submit
-              </Button>
-            </Box>
-          </Paper>
-        </Box>
-      </Box>
-    </ThemeProvider>
+                <Typography variant="h5" gutterBottom sx={{mt: 4}}>
+                  Detailed Review
+                </Typography>
+                {detailedResults.map((item, index) => (
+                  <QuestionReviewCard key={item.id || index} item={item} questionNumber={index + 1} />
+                ))}
+                <Button
+                    variant="contained"
+                    startIcon={<ArrowBack />}
+                    onClick={() => navigate(`/page3/${paperId}`)} 
+                    sx={{mt: 3}}
+                  >
+                    Back to Dashboard
+                  </Button>
+              </>
+            )}
+          </MainContent>
+        </StyledContainer>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
-}
+};
 
 export default Page4;
